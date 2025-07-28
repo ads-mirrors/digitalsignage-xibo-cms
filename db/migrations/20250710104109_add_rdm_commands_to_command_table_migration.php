@@ -57,13 +57,6 @@ class AddRdmCommandsToCommandTableMigration extends AbstractMigration
                     'createAlertOn' => 'never'
                 ],
                 [
-                    'command' => 'Install-APK',
-                    'code' => 'INSTALLAPK',
-                    'userId' => $user['userId'],
-                    'availableOn' => 'sony,dsDevices',
-                    'createAlertOn' => 'never'
-                ],
-                [
                     'command' => 'Install-OTA',
                     'code' => 'INSTALLOTA',
                     'userId' => $user['userId'],
