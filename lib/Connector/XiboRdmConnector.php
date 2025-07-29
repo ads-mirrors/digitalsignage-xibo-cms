@@ -368,7 +368,8 @@ class XiboRdmConnector implements ConnectorInterface
 
             if ($matchingCmsDisplay) {
                 $device['display'] = $matchingCmsDisplay->display ?? '';
-                $device['displayType'] = trim("$matchingCmsDisplay->manufacturer $matchingCmsDisplay->model");
+                $device['displayType'] = trim(($matchingCmsDisplay->manufacturer ?? '') . ' '
+                    . ($matchingCmsDisplay->model ?? ''));
 
                 $this->getLogger()->info('getDisplaysAndDevices: Processed Device - ' . json_encode($device));
 
