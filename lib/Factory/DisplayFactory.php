@@ -496,7 +496,7 @@ class DisplayFactory extends BaseFactory
 
         if ($parsedBody->getString('displayType', $filterBy) != '') {
             $body .= ' AND (`display`.brand LIKE :displayType OR `display`.model LIKE :displayType OR 
-                `display`.manufacturer LIKE :displayType OR `display`.osVersion LIKE :displayType) ';
+                `display`.manufacturer LIKE :displayType) ';
             $params['displayType'] = $parsedBody->getString('displayType', $filterBy);
         }
 
@@ -505,10 +505,10 @@ class DisplayFactory extends BaseFactory
             $params['rdmDeviceId'] = $parsedBody->getInt('rdmDeviceId', $filterBy);
         }
 
-        if ($parsedBody->getInt('cmsConnected') === 1) {
-            $body .= ' AND `display`.rdmDeviceId != 0 OR `display`.rdmDeviceId is NOT NULL ';
-        } else if ($parsedBody->getInt('cmsConnected') === 0) {
-            $body .= ' AND `display`.rdmDeviceId = 0 OR `display`.rdmDeviceId is NULL ';
+        if ($parsedBody->getInt('cmsConnected') == 1) {
+            $body .= ' AND (`display`.rdmDeviceId != 0 OR `display`.rdmDeviceId is NOT NULL) ';
+        } else if ($parsedBody->getInt('cmsConnected') == 0) {
+            $body .= ' AND (`display`.rdmDeviceId = 0 OR `display`.rdmDeviceId is NULL) ';
         }
 
         // Exclude a group?

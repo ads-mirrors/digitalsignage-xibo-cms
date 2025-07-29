@@ -150,7 +150,7 @@
     displayTable = $cmsDisplayTable.DataTable({
       language: dataTablesLanguage,
       dom: dataTablesTemplate,
-      serverSide: false,
+      serverSide: true,
       stateSave: false,
       responsive: true,
       filter: false,
@@ -241,13 +241,20 @@
       ajax: {
         url: $rdmConnector.data('proxyUrl').replace(':method', 'getDisplaysAndDevices'),
         data: function (d) {
-          $.extend(d, $('#cms-display-filter').serializeObject());
+          const formData = $('#cms-display-filter').serializeObject();
+
+          // cms uses 'sony' for the match
+          if (formData.type === 'Sony Bravia') {
+            formData.type = (formData.sourceFilter === 'cmsDisplay') ? 'Sony' : 'Sony Bravia';
+          }
+
+          $.extend(d, formData);
         }
       },
       columns: [
         { data: 'display', responsivePriority: 1 },
         { data: 'cmsDisplayId', responsivePriority: 1 },
-        { data: 'manufacturer', responsivePriority: 1 },
+        { data: 'displayType', responsivePriority: 1 },
         {
           data: null,
           responsivePriority: 1,
@@ -265,16 +272,18 @@
     linkedDeviceTable.on('processing.dt', dataTableProcessing);
 
     // Hide filters
-    var deviceNameFilters = $('.linkedDeviceName, .linkedDeviceId');
-    var displayNameFilters = $('.linkedDisplayName, .linkedDisplayId');
+    var deviceNameFilters = $('.linkedDeviceName');
+    var displayNameFilters = $('.linkedDisplayName');
     deviceNameFilters.hide();
 
     function triggerFilter(selectedValue) {
       if (selectedValue === 'cmsDisplay') {
         displayNameFilters.show();
+        deviceNameFilters.find('input').val('')
         deviceNameFilters.hide();
       } else {
         deviceNameFilters.show();
+        displayNameFilters.find('input').val('')
         displayNameFilters.hide();
       }
     }
@@ -527,7 +536,7 @@
                                   {% set title %}{% trans "Type" %}{% endset %}
                                   {% set options = [
                                       { optionid: "", option: "All" },
-                                      { optionid: "Sony Bravia", option: "Sony Bravia" },
+                                      { optionid: "Sony", option: "Sony Bravia" },
                                       { optionid: "DSDevices", option: "DSDevices" },
                                       { optionid: "Windows", option: "Windows" },
                                       { optionid: "ChromeOS", option: "ChromeOS" },
@@ -554,8 +563,7 @@
                                           <th></th>
                                       </tr>
                                       </thead>
-                                      <tbody>
-                                      </tbody>
+                                      <tbody></tbody>
                                       <tfoot>
                                           <tr>
                                               <th></th>
@@ -649,9 +657,6 @@
                                 { optionid: "ChromeOS", option: "ChromeOS" },
                               ] %}
                               {{ inline.dropdown("type", "single", title, "", options, "optionid", "option", helpText) }}
-
-                              {% set title %}{% trans "ID" %}{% endset %}
-                              {{ inline.input("displayId", title, '', '', 'linkedDisplayId') }}
 
                               {% set title %}{% trans "ID" %}{% endset %}
                               {{ inline.input("id", title, '', '', 'linkedDeviceId') }}

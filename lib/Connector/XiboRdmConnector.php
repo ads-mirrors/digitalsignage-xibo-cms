@@ -320,10 +320,10 @@ class XiboRdmConnector implements ConnectorInterface
         $devices = [];
 
         // Fetch CMS displays or devices based on the source
-        if ($source === 'cmsDisplay') {
+        if ($source == 'cmsDisplay') {
             $cmsDisplays = $this->displayFactory->query(null, [
                 'cmsConnected' => 1,
-                'displayId' => $params->getInt('displayId'),
+                'displayId' => $params->getInt('id'),
                 'display' => $params->getString('display'),
                 'displayType' => $params->getString('type')
             ]);
@@ -356,6 +356,7 @@ class XiboRdmConnector implements ConnectorInterface
 
         // Prepare a mapping of CMS displays for quick lookup
         $cmsDisplayMap = [];
+        $matchedDevices = [];
 
         foreach ($cmsDisplays as $cmsDisplay) {
             $cmsDisplayMap[$cmsDisplay->displayId] = $cmsDisplay;
@@ -365,11 +366,19 @@ class XiboRdmConnector implements ConnectorInterface
         foreach ($devices['data'] as &$device) {
             $matchingCmsDisplay = $cmsDisplayMap[$device['cmsDisplayId']] ?? null;
 
-            $device['display'] = $matchingCmsDisplay->display ?? '';
-            $device['manufacturer'] = $matchingCmsDisplay->manufacturer ?? '';
+            if ($matchingCmsDisplay) {
+                $device['display'] = $matchingCmsDisplay->display ?? '';
+                $device['displayType'] = trim("$matchingCmsDisplay->manufacturer $matchingCmsDisplay->model");
 
-            $this->getLogger()->info('getDisplaysAndDevices: Processed Device - ' . json_encode($device));
+                $this->getLogger()->info('getDisplaysAndDevices: Processed Device - ' . json_encode($device));
+
+                $matchedDevices[] = $device;
+            }
         }
+
+        $devices['data'] = $matchedDevices;
+        $devices['recordsFiltered'] = count($matchedDevices);
+        $devices['recordsTotal'] = count($matchedDevices);
 
         return $devices;
     }
