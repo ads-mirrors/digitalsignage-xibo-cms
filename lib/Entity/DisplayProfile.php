@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -285,7 +285,14 @@ class DisplayProfile implements \JsonSerializable
      */
     public function getClientType()
     {
-        return (empty($this->clientType)) ? $this->type : $this->clientType;
+        $clientType = (empty($this->clientType)) ? $this->type : $this->clientType;
+
+        // Check if it has a specific android subtype
+        if ($clientType == 'android') {
+           $clientType = $this->checkDisplayType($this);
+        }
+
+        return $clientType;
     }
 
     /**
@@ -606,5 +613,26 @@ class DisplayProfile implements \JsonSerializable
         ));
 
         return (!empty($elevatedUntil) && $elevatedUntil >= Carbon::now()->format('U'));
+    }
+
+    /**
+     * Checks display type
+     * @param $display
+     * @return string
+     */
+    private function checkDisplayType($display): string
+    {
+        $manufacturerModel = ($display->manufacturer ?? '') . ' ' . ($display->model ?? '');
+
+        // Set default to Android
+        $displayType = 'android';
+
+        if (preg_match('/sony|bravia/i', $manufacturerModel)) {
+            $displayType = 'sony';
+        } elseif (preg_match('/dsdevice/i', $manufacturerModel)) {
+            $displayType = 'dsDevices';
+        }
+
+        return $displayType;
     }
 }

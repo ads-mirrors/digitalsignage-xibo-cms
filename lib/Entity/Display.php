@@ -1024,12 +1024,12 @@ class Display implements \JsonSerializable
                 email_alert, alert_timeout, clientAddress, xmrChannel, xmrPubKey, lastCommandSuccess, macAddress, 
                 lastChanged, lastWakeOnLanCommandSent, client_type, client_version, client_code, overrideConfig, 
                 newCmsAddress, newCmsKey, commercialLicence, lanIpAddress, syncGroupId, osVersion, osSdk, manufacturer, 
-                brand, model, rdmDeviceId)
+                brand, model, rdmDeviceId, displayProfileId)
               VALUES (:display, :auditingUntil, :defaultlayoutid, :license, :licensed, :lastAccessed, :inc_schedule, 
                 :email_alert, :alert_timeout, :clientAddress, :xmrChannel, :xmrPubKey, :lastCommandSuccess, :macAddress, 
                 :lastChanged, :lastWakeOnLanCommandSent, :clientType, :clientVersion, :clientCode, :overrideConfig, 
                 :newCmsAddress, :newCmsKey, :commercialLicence, :lanIpAddress, :syncGroupId, :osVersion, :osSdk, 
-                :manufacturer, :brand, :model, :rdmDeviceId)
+                :manufacturer, :brand, :model, :rdmDeviceId, :displayProfileId)
         ', [
             'display' => $this->display,
             'auditingUntil' => 0,
@@ -1061,7 +1061,8 @@ class Display implements \JsonSerializable
             'manufacturer' => $this->manufacturer,
             'brand' => $this->brand,
             'model' => $this->model,
-            'rdmDeviceId' => null
+            'rdmDeviceId' => null,
+            'displayProfileId' => empty($this->displayProfileId) ? null : $this->displayProfileId
         ]);
 
 

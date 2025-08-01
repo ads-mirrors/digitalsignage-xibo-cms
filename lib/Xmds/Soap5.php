@@ -179,7 +179,6 @@ class Soap5 extends Soap4
                     if (strtolower($settingName) == 'usecefwebbrowser' && ($clientType == 'windows')) {
                         $arrayItem['value'] = 0;
                     }
-                  
                     // Override the XMR address if empty
                     if (strtolower($settingName) == 'xmrnetworkaddress' &&
                         (!isset($arrayItem['value']) || $arrayItem['value'] == '')
@@ -275,7 +274,7 @@ class Soap5 extends Soap4
                 // cms move
                 $displayMoveAddress = ($clientType == 'windows') ? 'NewCmsAddress' : 'newCmsAddress';
                 $node = $return->createElement($displayMoveAddress, $display->newCmsAddress);
-                
+
                 if ($clientType == 'windows') {
                     $node->setAttribute('type', 'string');
                 }
@@ -468,6 +467,13 @@ class Soap5 extends Soap4
         $display->brand = $operatingSystemJson->brand ?? null;
         $display->model = $operatingSystemJson->model ?? null;
 
+        // Check the display profile subtype for android
+        if ($display->clientType == 'android') {
+            $displayType = $this->displayProfileFactory->getDefaultByType($this->checkDisplayType($display));
+            $display->displayProfileId = $displayType->displayProfileId;
+            $display->model = $this->checkDisplayType($display);
+        }
+
         // Commercial Licence Check,  0 - Not licensed, 1 - licensed, 2 - trial licence, 3 - not applicable
         // only sent by xmds v7
         if (!empty($commercialLicenceString) && !in_array($display->clientType, ['windows', 'linux'])) {
@@ -561,5 +567,26 @@ class Soap5 extends Soap4
     public function Schedule($serverKey, $hardwareKey)
     {
         return $this->doSchedule($serverKey, $hardwareKey, ['dependentsAsNodes' => true, 'includeOverlays' => true]);
+    }
+
+    /**
+     * Checks display type
+     * @param $display
+     * @return string
+     */
+    private function checkDisplayType($display): string
+    {
+        $manufacturerModel = ($display->manufacturer ?? '') . ' ' . ($display->model ?? '');
+
+        // Set default to Android
+        $displayType = 'android';
+
+        if (preg_match('/sony|bravia/i', $manufacturerModel)) {
+            $displayType = 'sony';
+        } elseif (preg_match('/dsdevice/i', $manufacturerModel)) {
+            $displayType = 'dsDevices';
+        }
+
+        return $displayType;
     }
 }

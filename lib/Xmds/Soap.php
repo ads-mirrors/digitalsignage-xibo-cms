@@ -39,6 +39,7 @@ use Xibo\Factory\DataSetFactory;
 use Xibo\Factory\DayPartFactory;
 use Xibo\Factory\DisplayEventFactory;
 use Xibo\Factory\DisplayFactory;
+use Xibo\Factory\DisplayProfileFactory;
 use Xibo\Factory\LayoutFactory;
 use Xibo\Factory\MediaFactory;
 use Xibo\Factory\ModuleFactory;
@@ -126,6 +127,9 @@ class Soap
     /** @var  DisplayFactory */
     protected $displayFactory;
 
+    /** @var  DisplayProfileFactory */
+    protected $displayProfileFactory;
+
     /** @var  UserGroupFactory */
     protected $userGroupFactory;
 
@@ -184,6 +188,7 @@ class Soap
      * @param LayoutFactory $layoutFactory
      * @param DataSetFactory $dataSetFactory
      * @param DisplayFactory $displayFactory
+     * @param DisplayProfileFactory $displayProfileFactory
      * @param UserFactory $userGroupFactory
      * @param BandwidthFactory $bandwidthFactory
      * @param MediaFactory $mediaFactory
@@ -224,7 +229,8 @@ class Soap
         $dispatcher,
         $campaignFactory,
         $syncGroupFactory,
-        $playerFaultFactory
+        $playerFaultFactory,
+        $displayProfileFactory
     ) {
         $this->logProcessor = $logProcessor;
         $this->pool = $pool;
@@ -252,6 +258,7 @@ class Soap
         $this->campaignFactory = $campaignFactory;
         $this->syncGroupFactory = $syncGroupFactory;
         $this->playerFaultFactory = $playerFaultFactory;
+        $this->displayProfileFactory = $displayProfileFactory;
     }
 
     /**

@@ -3246,7 +3246,7 @@ class Display extends Base
 
         if (preg_match('/sony|bravia/i', $manufacturerModel)) {
             $displayType = 'sony';
-        } elseif (preg_match('/dsdevices/i', $manufacturerModel)) {
+        } elseif (preg_match('/dsdevice/i', $manufacturerModel)) {
             $displayType = 'dsDevices';
         }
 

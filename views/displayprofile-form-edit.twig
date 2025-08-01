@@ -69,6 +69,10 @@
         {{ include('displayprofile-form-edit-soc.twig') }}
     {% elseif displayProfile.getClientType() == "chromeOS" %}
         {{ include('displayprofile-form-edit-chromeos.twig') }}
+    {% elseif displayProfile.getClientType() == "sony" %}
+        {% include "displayprofile-form-edit-sony.twig" %}
+    {% elseif displayProfile.getClientType() == "dsDevices" %}
+        {% include "displayprofile-form-edit-dsdevices.twig" %}
     {% elseif displayProfile.isCustom() %}
         {{ include(displayProfile.getCustomEditTemplate()) }}
     {% else %}
