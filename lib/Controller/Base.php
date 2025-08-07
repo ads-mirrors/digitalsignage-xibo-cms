@@ -461,7 +461,7 @@ class Base
                     $size = $sanitizedParams->getInt('length', ['default' => 10]);
 
                     $linkHeader = '';
-                    $url = (new HttpsDetect())->getUrl() . $request->getUri()->getPath();
+                    $url = (new HttpsDetect())->getRootUrl() . $request->getUri()->getPath();
 
                     // Is there a next page?
                     if ($start + $size < $totalRows) {
