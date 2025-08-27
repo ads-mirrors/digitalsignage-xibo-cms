@@ -143,10 +143,33 @@ window.templates = {
   welcome: {
     welcomeCard:
       require('./src/templates/welcome/welcome-card.hbs'),
-      serviceCard:
+    serviceCard:
       require('./src/templates/welcome/service-card.hbs'),
     othersCard:
       require('./src/templates/welcome/others-card.hbs'),
+    videoModal:
+      require('./src/templates/welcome/video-modal.hbs'),
+    videoModalContent:
+      require('./src/templates/welcome/video-modal-content.hbs'),
+  },
+  help: {
+    mainPanel:
+      require('./src/templates/help/help-main-panel.hbs'),
+    feedbackForm:
+      require('./src/templates/help/help-feedback-form.hbs'),
+    endPanel:
+      require('./src/templates/help/help-end-panel.hbs'),
+    components: {
+      card:
+        require('./src/templates/help/components/help-card.hbs'),
+      listCard:
+        require('./src/templates/help/components/help-list-card.hbs'),
+      uploadCard:
+        require('./src/templates/help/components/help-upload-card.hbs'),
+      errorMessage:
+        require('./src/templates/help/components/help-upload-error-msg.hbs'),
+      header:
+        require('./src/templates/help/components/help-header.hbs'),
+    },
   },
 };
-

@@ -8,6 +8,7 @@ $xibo-color-accent: #EB7857;
 
 //  Variants
 $xibo-color-primary-d60: #0E4694;
+$xibo-color-primary-d40: #125ABF;
 $xibo-color-primary-l60: #74ACFA;
 $xibo-color-primary-l30: #B9D6FC;
 $xibo-color-primary-l20: #dcedff;
@@ -32,6 +33,7 @@ $xibo-color-semantic-info: #5593BF;
 
 // Overlay
 $xibo-color-overlay: rgba(0, 0, 0, 0.6);
+$xibo-color-overlay-light: rgba(255, 255, 255, 0.6);
 
 // Specific
 $xibo-color-selected: $xibo-color-accent;
@@ -46,11 +48,6 @@ $xibo-color-region-selected: lighten($xibo-color-accent, 15%);
 
 $xibo-color-widget-hover: lighten($xibo-color-semantic-success, 15%);
 $xibo-color-widget-selected: lighten($xibo-color-semantic-success, 15%);
-
-$xibo-color-action-target: #D07CEE;
-$xibo-color-action-target-light: #EFDDF5;
-$xibo-color-action-trigger: #86F4DA;
-$xibo-color-action-trigger-light: #E3FDF6;
 
 // ZINDEX
 $viewer-object-group-overlay-z-index: 1001;
@@ -73,8 +70,8 @@ $toolbar-card-z-index: 1060;
 
 $properties-panel-rich-text-container-z-index: 1050;
 
+$layout-dock-results-z-index: 1090;
 $preview-playing-z-index: 2000;
-
 
 $code-editor-fullscreen-overlay-z-index: 2030;
 $code-editor-fullscreen-z-index: 2040;
@@ -104,3 +101,7 @@ $properties-panel-width: 320px;
 $viewer-bottom-bar-height: 64px;
 $viewer-bottom-bar-border-width: 2px;
 $viewer-bottom-bar-plus-border-height: calc($viewer-bottom-bar-height + $viewer-bottom-bar-border-width);
+
+// Bootstrap
+$bootstrap-theme-main-color: #337ab7;
+$bootstrap-theme-error-color: #DC3545;

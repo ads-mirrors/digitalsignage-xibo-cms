@@ -185,9 +185,9 @@ window.XiboInitialise = function(scope, options) {
     const min = $input.attr('min');
 
     $input.on('blur', () => {
-      (max && $input.val() > max) &&
+      (max && Number($input.val()) > Number(max)) &&
         ($input.val(max).trigger('change'));
-      (min && $input.val() < min) &&
+      (min && Number($input.val()) < Number(min)) &&
         ($input.val(min).trigger('change'));
     });
   });
@@ -316,6 +316,7 @@ window.XiboInitialise = function(scope, options) {
         initialize: false,
         remote: {
           url: autoCompleteUrl,
+          cache: false,
           prepare: function(query, settings) {
             settings.data = {tag: query};
             return settings;
@@ -2438,6 +2439,9 @@ window.SystemMessageInline = function(messageText, modal) {
   // Re-enabled any disabled buttons
   $(modal).find('.btn').removeClass('disabled');
 
+  // Remove loading from button if exist
+  $(modal).find('.btn i.fa-cog').remove();
+
   $('<div/>', {
     class: 'card bg-light p-3 text-danger col-sm-12 text-center form-error',
     html: messageText,
@@ -2612,26 +2616,17 @@ window.makePagedSelect = function(
       type: 'GET',
       data: dataObj,
     }).then(function(data) {
-      // Do we need to check if it's selected
-      let checkSelected = false;
-
       // If we have a custom data formatter
       if (
         dataFormatter &&
         typeof dataFormatter === 'function'
       ) {
         data = dataFormatter(data);
-        checkSelected = true;
       }
 
       // create the option and append to Select2
       data.data.forEach((object) => {
-        let isSelected = true;
-
-        // Check if it's selected if needed
-        if (checkSelected) {
-          isSelected = (initialValue == object[idProperty]);
-        }
+        const isSelected = (initialValue == object[idProperty]);
 
         // Only had if the option is selected
         if (isSelected) {
