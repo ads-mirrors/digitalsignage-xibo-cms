@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -25,25 +25,27 @@ const XiboPlayer = function() {
   this.countGlobalElements = 0;
   this.urlParams = new URLSearchParams(window.location.search);
 
-  /**
-   * Get widget data
-   * @param {Object} currentWidget Widget object
-   * @return {Promise<unknown>}
-   */
-  this.getWidgetData = async function(currentWidget) {
-    // if we are a dataset type, then first check to see if there
-    // is realtime data.
-    console.debug('getWidgetData: ' + currentWidget.widgetId);
-
+  this.getDataSetRealtimeData = async function(currentWidget) {
     let localData;
-    if (currentWidget.properties?.dataSetId) {
-      await xiboIC.getData(currentWidget.properties?.dataSetId, {
-        done: (status, data) => {
-          localData = JSON.parse(data);
-        },
-      });
-    }
+    await xiboIC.getData(currentWidget.properties.dataSetId, {
+      done: (status, data) => {
+        localData = JSON.parse(data);
+      },
+    });
 
+    if (localData) {
+      return new Promise((res, rej) => {
+        res({
+          data: localData,
+          isDataReady: true,
+        });
+      });
+    } else {
+      return this.getWidgetDataRequest(currentWidget);
+    }
+  };
+
+  this.getWidgetDataRequest = function(currentWidget) {
     return new Promise(function(resolve) {
       // if we have data on the widget (for older players),
       // or if we are not in preview and have empty data on Widget (like text)
@@ -64,10 +66,6 @@ const XiboPlayer = function() {
         // or new json file for v4 players
         $.ajax(ajaxOptions).done(function(data) {
           // The contents of the JSON file will be an object with data and meta
-          // add in local data.
-          if (localData) {
-            data.data = localData;
-          }
 
           let widgetData = data;
 
@@ -91,9 +89,6 @@ const XiboPlayer = function() {
       } else if (currentWidget.data?.data !== undefined) {
         // This happens for v3 players where the data is already
         // added to the HTML
-        if (localData) {
-          currentWidget.data.data = localData;
-        }
         resolve({
           ...currentWidget.data,
           isDataReady: true,
@@ -103,6 +98,23 @@ const XiboPlayer = function() {
         resolve(null);
       }
     });
+  };
+
+  /**
+   * Get widget data
+   * @param {Object} currentWidget Widget object
+   * @return {Promise<unknown>}
+   */
+  this.getWidgetData = async function(currentWidget) {
+    // if we are a dataset type, then first check to see if there
+    // is realtime data.
+    console.debug('getWidgetData: ' + currentWidget.widgetId);
+
+    if (Object.hasOwn(currentWidget.properties, 'dataSetId')) {
+      return this.getDataSetRealtimeData(currentWidget);
+    } else {
+      return this.getWidgetDataRequest(currentWidget);
+    }
   };
 
   /**
@@ -742,7 +754,7 @@ XiboPlayer.prototype.init = function() {
 
   // Loop through each widget from widgetData
   if (widgetData.length > 0) {
-    widgetData.forEach(function(inputWidget, widgetIndex) {
+    widgetData.forEach(async function(inputWidget, widgetIndex) {
       // Save widgetData to xic
       xiboIC.set(inputWidget.widgetId, 'widgetData', inputWidget);
 
@@ -768,8 +780,7 @@ XiboPlayer.prototype.init = function() {
 
       // Check if inputWidget is a data widget
       if (inputWidget.isDataExpected) {
-        // Load data
-        self.getWidgetData(inputWidget).then(function(response) {
+        const renderWidgetData = function(requestedWidgetData) {
           if (self.isStaticWidget(inputWidget)) {
             console.debug('Data Widget::Static Template');
             self.countWidgetStatic++;
@@ -778,9 +789,14 @@ XiboPlayer.prototype.init = function() {
             self.countWidgetElements++;
           }
 
+          console.debug(
+            '[Xibo-Player::init] /renderWidgetData >> requestedWidgetData',
+            requestedWidgetData,
+          );
+
           const currentWidget = self.playerWidget(
             inputWidget,
-            response,
+            requestedWidgetData,
             true,
           );
           self.playerWidgets[inputWidget.widgetId] = currentWidget;
@@ -791,14 +807,22 @@ XiboPlayer.prototype.init = function() {
             self.runLayoutScaler(currentWidget);
             calledXiboScaler = true;
           }
-        });
+        };
 
-        // Handle real-time data/dataset
-        if (inputWidget.properties?.dataSetId) {
-          xiboIC.registerNotifyDataListener((dataKey) => {
+        // Load data
+        const widgetDataResponse = await self.getWidgetData(inputWidget);
+
+        renderWidgetData(widgetDataResponse);
+
+        // Handle real-time data/dataset update
+        if (Object.hasOwn(inputWidget.properties, 'dataSetId')) {
+          xiboIC.registerNotifyDataListener(async (dataKey) => {
             // Loose match.
-            if (dataKey == inputWidget.properties?.dataSetId) {
-              inputWidget.render();
+            if (dataKey == inputWidget.properties.dataSetId) {
+              const dataSetRealtimeDataRes =
+                await self.getDataSetRealtimeData(inputWidget);
+
+              renderWidgetData(dataSetRealtimeDataRes);
             }
           });
         }
