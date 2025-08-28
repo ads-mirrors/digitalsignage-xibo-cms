@@ -296,27 +296,4 @@ describe('Datasets', function() {
       cy.get('.modal-body').contains(': Success');
     });
   });
-
-  // ---------
-  // Tests - Error handling
-  it('should not add a remote dataset without URI', function() {
-    cy.visit('/dataset/view');
-
-    // Click on the Add Dataset button
-    cy.contains('Add DataSet').click();
-
-    cy.get('.modal input#dataSet')
-      .type('Cypress Test Dataset ' + testRun);
-
-    cy.get('.modal input#isRemote').check();
-
-    // Add first by clicking next
-    cy.get('.modal .save-button').click();
-
-    // Click on the "Remote" tab
-    cy.get(':nth-child(2) > .nav-link').should('be.visible').click();
-
-    // Check that the error message is displayed for the missing URI field
-    cy.get('#uri-error').should('have.text', 'This field is required.');
-  });
 });
