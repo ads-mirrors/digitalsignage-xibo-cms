@@ -377,6 +377,21 @@ Cypress.Commands.add('removeAllSelectedOptions', (select2) => {
     });
 });
 
+// Select an item from the select2 dropdown
+Cypress.Commands.add('selectFromDropdown', (selector, searchText, expected, alias, index = 0) => {
+  cy.get(selector).type(searchText);
+
+  if (alias) {
+    cy.wait(alias).its('response.statusCode').should('eq', 200);
+  }
+
+  cy.get('.select2-container--open .select2-dropdown .select2-results > ul')
+    .should('contain', expected);
+  cy.get('.select2-container--open .select2-dropdown .select2-results > ul > li')
+    .eq(index)
+    .click();
+});
+
 // Select an option from the select2
 Cypress.Commands.add('selectOption', (content) => {
   cy.get('.select2-container--open').contains(content);
