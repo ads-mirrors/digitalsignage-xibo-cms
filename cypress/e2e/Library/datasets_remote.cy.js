@@ -65,7 +65,7 @@ describe('Datasets', function() {
 
     cy.get('a[href="#gateway"]').click();
 
-    cy.get('#uri').type('https://ceu.xibo.co.uk/test.json');
+    cy.get('#uri').type('https://jsonplaceholder.typicode.com/posts/1');
 
     cy.get('a[href="#data"]').click();
 
@@ -80,7 +80,7 @@ describe('Datasets', function() {
     cy.contains('Added Cypress Test Dataset ' + testRun + '_1');
   });
   
-  it('should be able to add csv remote dataset', function() {
+  it.only('should be able to add csv remote dataset', function() {
     cy.visit('/dataset/view');
 
     // Click on the Add Dataset button
@@ -93,7 +93,7 @@ describe('Datasets', function() {
 
     cy.get('a[href="#gateway"]').click();
 
-    cy.get('#uri').type('http://localhost/cy_people.csv');
+    cy.get('#uri').type('http://localhost/cy_people2.csv');
 
     cy.get('a[href="#data"]').click();
 
@@ -110,7 +110,7 @@ describe('Datasets', function() {
     cy.contains('Added Cypress Test Dataset ' + testRun + '_1');
   });
 
-  it.skip('should be seeing data in created remote dataset', function() {
+  it('should be seeing data in created remote dataset', function() {
     cy.visit('/dataset/view');
 
     cy.get('div[title="Row Menu"]').first().click();
