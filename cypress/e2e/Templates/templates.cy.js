@@ -20,79 +20,117 @@
  */
 
 describe('Template Test Suite', function () {
+
   let templateName = '';
+
+  // create template flow
+  function createTemplate(name) {
+    cy.visit('/template/view');
+    cy.contains('Add Template').click();
+    cy.get('#name').clear().type(name);
+    cy.get('#dialog_btn_2').should('be.visible').click();
+    cy.get('#layout-editor').should('be.visible');
+    cy.get('#backBtn').click({ force: true });
+  }
+
+  // delete template flow
+  function deleteATemplate(name) {
+    cy.get('div[title="Row Menu"] button.dropdown-toggle').click({ force: true });
+    cy.get('a.layout_button_delete[data-commit-method="delete"]').click({ force: true });
+
+    cy.get('#layoutDeleteForm').should('be.visible');
+    cy.contains('p', 'Are you sure you want to delete this item?').should('be.visible');
+  }
 
   beforeEach(function () {
     cy.login();
-
     templateName = 'Template No. ' + Cypress._.random(0, 1e9);
-
-    // Always intercept before visiting
-    cy.intercept('GET', '**/template*').as('templatesList');
-    cy.visit('/template/view');
-    cy.wait('@templatesList').its('response.statusCode').should('eq', 200);
-
-    // Open Add Template form
-    cy.contains('Add Template').click();
   });
 
-  it('Prevents saving incomplete template', function () {
+  // Display Template List
+  it('should display the template list', function () {
+    cy.intercept('GET', '**/template*').as('templateList');
+    cy.visit('/template/view');
+    cy.wait('@templateList').its('response.statusCode').should('eq', 200);
+  });
+
+  // Save Incomplete Form
+  it('should prevent saving incomplete template', function () {
+    cy.visit('/template/view');
+    cy.contains('Add Template').click();
     cy.get('#dialog_btn_2').should('be.visible').click();
     cy.contains('Layout Name must be between 1 and 100 characters').should('be.visible');
   });
 
-  it('Creates a template, opens it, exits editor, searches, and deletes', function () {
-    // Create template
+  // Create a Template
+  it('should create a template', function () {
+    createTemplate(templateName);
+    cy.contains('td', templateName).should('be.visible');
+  });
+
+  // Duplicate Template
+  it('should not allow duplicate template name', function () {
+    createTemplate(templateName);
+
+    cy.contains('Add Template').click();
     cy.get('#name').clear().type(templateName);
     cy.get('#dialog_btn_2').should('be.visible').click();
-    cy.get('#layout-editor').should('be.visible');
 
-    // Exit editor and verify template was created
-    cy.get('#backBtn').click({ force: true });
-    cy.contains('td', templateName).should('exist');
+    cy.get('.modal-footer .form-error')
+      .contains(`You already own a Layout called '${templateName}'. Please choose another name.`)
+      .should('be.visible');
+  });
 
-    // Reopen the newly created template
-    cy.contains('td', templateName)
-      .should('be.visible')
-      .parents('tr')
-      .within(() => {
-        cy.get('div[title="Row Menu"] button.dropdown-toggle').click({
-          force: true,
-        });
-        cy.get('a.layout_button_design').click({ force: true });
-      });
-    cy.get('#layout-editor').should('be.visible');
+  // Search and Delete a template
+  it('should search template and delete it', function () {
+    cy.intercept({
+      url: '/template?*',
+      query: { template: templateName },
+    }).as('displayTemplateAfterSearch');
 
-    // Exit editor and assert landing page
-    cy.get('#backBtn').click({ force: true });
-    cy.contains('.widget-title', 'Templates').should('be.visible');
+    createTemplate(templateName);
 
-    // Search for the template
     cy.get('#template').clear().type(templateName);
-    cy.wait('@templatesList');
+    cy.wait('@displayTemplateAfterSearch');
+    cy.get('table tbody tr').should('have.length', 1);
+    cy.get('#templates tbody tr:nth-child(1) td:nth-child(1)').contains(templateName);
 
-    // Delete the template
-    cy.contains('td', templateName)
-      .should('be.visible')
-      .parents('tr')
-      .within(() => {
-        cy.get('div[title="Row Menu"] button.dropdown-toggle').click({ force: true});
-        cy.get('a.layout_button_delete[data-commit-method="delete"]').click({force: true});
-      });
+    cy.get('#templates tbody tr')
+      .should('have.length', 1)
+      .first()
+      .should('contain.text', templateName);
 
-    cy.get('#layoutDeleteForm').should('be.visible');
-    cy.contains('p', 'Are you sure you want to delete this item?').should('be.visible');
-    cy.contains('Yes').click({ force: true });
+    // delete template = no
+    deleteATemplate(templateName);
+    cy.get('#dialog_btn_2').click({ force: true });
+    cy.contains(templateName).should('be.visible');
 
-    // Verify deletion
+    // delete template = yes
+    deleteATemplate(templateName);
+    cy.get('#dialog_btn_3').click({ force: true });
+    cy.get('#toast-container .toast-message').contains(`Deleted ${templateName}`).should('be.visible');
+    cy.contains(templateName).should('not.exist');
+  });
+
+  // Multiple deleting of templates
+  it('should delete multiple templates', function () {
+    createTemplate(templateName);
+
+    cy.get('button[data-toggle="selectAll"]').click();
+    cy.get('.dataTables_info button[data-toggle="dropdown"]').click();
+    cy.get('a[data-button-id="layout_button_delete"]').click();
+
+    cy.get('.modal-footer').contains('Save').click();
+    cy.get('.modal-body').contains(': Success');
+    cy.get('.modal-footer').contains('Close').click();
     cy.contains('.dataTables_empty', 'No data available in table').should('be.visible');
   });
-});
 
-/*
- * TO DOs:
- * 1. Add "No" and "Retire" flow for delete modal
- * 2. Ensure duplicate template creation is not possible
- * 3. Layout Editor: change background, etc. -- this should not be covered here
- * 4. Search for non-existing template
- */
+  // Search for non-existing template
+  it('should not return any entry for non-existing template', function () {
+    cy.visit('/template/view');
+    cy.get('#template').clear().type('This is a hardcoded template name just to make sure it doesnt exist in the record');
+    cy.contains('.dataTables_empty', 'No data available in table').should('be.visible');
+  });
+
+});
