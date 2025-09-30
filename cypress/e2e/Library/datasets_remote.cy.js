@@ -70,7 +70,7 @@ describe('Remote Datasets', function() {
 
     cy.get('a[href="#gateway"]').click();
 
-    cy.get('#uri').type('http://localhost/cy_people2.csv');
+    cy.get('#uri').type('http://web/cy_people2.csv');
 
     cy.get('a[href="#data"]').click();
 
