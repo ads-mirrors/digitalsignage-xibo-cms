@@ -31,6 +31,7 @@ use Psr\Log\NullLogger;
 use Slim\Views\Twig;
 use Twig\Extension\SandboxExtension;
 use Twig\Sandbox\SecurityPolicy;
+use Twig\TwigFilter;
 use Xibo\Entity\Module;
 use Xibo\Entity\ModuleTemplate;
 use Xibo\Entity\Region;
@@ -886,10 +887,13 @@ class WidgetHtmlRenderer
             'cache' => false,
         ]);
 
+        // Add missing filter
+        $sandbox->getEnvironment()->addFilter(new TwigFilter('url_decode', 'urldecode'));
+
         // Configure a security policy
         // Create a new security policy
         $policy = new SecurityPolicy();
-        $policy->setAllowedTags(['if', 'for', 'set']);
+        $policy->setAllowedTags(['if', 'for', 'set', 'import', 'macro']);
         $policy->setAllowedFilters(['escape', 'raw', 'url_decode']);
 
         // Create a Sandbox
