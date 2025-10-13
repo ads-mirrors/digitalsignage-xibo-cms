@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2023 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -20,34 +20,19 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Xibo\Widget\Definition;
-
 /**
- * Player compatibility
+ * Migrations for core-canvas module duration
+ * @phpcs:disable PSR1.Classes.ClassDeclaration.MissingNamespace
  */
-class PlayerCompatibility implements \JsonSerializable
-{
-    public $windows;
-    public $linux;
-    public $android;
-    public $webos;
-    public $tizen;
-    public $chromeos;
-    public $message;
 
-    /**
-     * @inheritDoc
-     */
-    public function jsonSerialize(): array
+use Phinx\Migration\AbstractMigration;
+
+class UpdateCoreCanvasDurationInModuleTableMigration extends AbstractMigration
+{
+    public function change(): void
     {
-        return [
-            'windows' => $this->windows,
-            'linux' => $this->linux,
-            'android' => $this->android,
-            'webos' => $this->webos,
-            'tizen' => $this->tizen,
-            'chromeos' => $this->chromeos,
-            'message' => $this->message,
-        ];
+        $this->execute('UPDATE `module` SET `defaultDuration` = 10 WHERE `moduleId` = :moduleId', [
+            'moduleId' => 'core-canvas',
+        ]);
     }
 }
