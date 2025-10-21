@@ -1,0 +1,12 @@
+:root {
+  --color-primary: #2157a3;
+  --color-secondary: #a96011;
+  --color-bg: #fff;
+  --color-text: #000;
+}
+
+.theme-dark {
+  --color-primary: #0e0e0e;
+  --color-bg: #121212;
+  --color-text: #ffffff;
+}

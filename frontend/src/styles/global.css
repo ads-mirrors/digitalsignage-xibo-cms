@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Preline UI (v4 way) */
+@import "preline/variants.css";
+@source "./node_modules/preline/dist/*.js";
+@plugin "@tailwindcss/forms";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* App-wide tweaks */
+html, body, #root { height: 100%; }
