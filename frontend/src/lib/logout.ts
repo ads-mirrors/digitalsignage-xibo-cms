@@ -1,0 +1,6 @@
+import { clearAccessToken } from './auth';
+
+export function logout() {
+  clearAccessToken();
+  window.location.href = '/login';
+}
