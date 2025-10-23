@@ -97,6 +97,7 @@ class Schedule extends Base
 
     /** @var  DayPartFactory */
     private $dayPartFactory;
+
     private SyncGroupFactory $syncGroupFactory;
 
     /**
@@ -158,7 +159,7 @@ class Schedule extends Base
             'defaultLong' => $defaultLong,
             'eventTypes' => \Xibo\Entity\Schedule::getEventTypes(),
         ];
-        
+
         // Render the Theme and output
         $this->getState()->template = 'schedule-page';
         $this->getState()->setData($data);
@@ -700,7 +701,7 @@ class Schedule extends Base
                     $branch->getUnmatchedProperty('depth') . '-' .
                     $branch->getUnmatchedProperty('level')
                 );
-                
+
                 if ($branch->getUnmatchedProperty('depth') < 0 &&
                     $branch->displayGroupId != $eventDisplayGroup->displayGroupId
                 ) {
@@ -1076,8 +1077,8 @@ class Schedule extends Base
         $schedule->userId = $this->getUser()->userId;
         $schedule->eventTypeId = $sanitizedParams->getInt('eventTypeId');
         $schedule->campaignId = $this->isFullScreenSchedule($schedule->eventTypeId)
-                ? $sanitizedParams->getInt('fullScreenCampaignId')
-                : $sanitizedParams->getInt('campaignId');
+            ? $sanitizedParams->getInt('fullScreenCampaignId')
+            : $sanitizedParams->getInt('campaignId');
         $schedule->commandId = $sanitizedParams->getInt('commandId');
         $schedule->displayOrder = $sanitizedParams->getInt('displayOrder', ['default' => 0]);
         $schedule->isPriority = $sanitizedParams->getInt('isPriority', ['default' => 0]);
@@ -1129,6 +1130,23 @@ class Schedule extends Base
                 }
             ]);
             $schedule->dataSetParams = $sanitizedParams->getString('dataSetParams');
+        }
+
+        // Create fullscreen layout for media/playlist events
+        if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
+            $type = $schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT ? 'media' : 'playlist';
+            $id = ($type === 'media') ? $sanitizedParams->getInt('mediaId') : $sanitizedParams->getInt('playlistId');
+
+            $fsLayout = $this->layoutFactory->createFullScreenLayout(
+                $type,
+                $id,
+                $sanitizedParams->getInt('resolutionId'),
+                $sanitizedParams->getString('backgroundColor'),
+                $sanitizedParams->getInt('layoutDuration'),
+            );
+
+            $schedule->campaignId = $this->layoutFactory->getCampaignIdFromLayoutHistory($fsLayout->layoutId);
+            $schedule->parentCampaignId = $schedule->campaignId;
         }
 
         // API request can provide an array of coordinates or valid GeoJSON, handle both cases here.
@@ -1380,7 +1398,7 @@ class Schedule extends Base
 
         if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
             $schedule->setUnmatchedProperty('fullScreenCampaignId', $schedule->campaignId);
-            
+
             if ($schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT) {
                 $schedule->setUnmatchedProperty(
                     'mediaId',
@@ -1392,6 +1410,16 @@ class Schedule extends Base
                     $this->layoutFactory->getLinkedFullScreenPlaylistId($schedule->campaignId)
                 );
             }
+
+            // Get the associated fullscreen layout
+            $fsLayout = $this->layoutFactory->getById(
+                $this->campaignFactory->getLinkedLayouts($schedule->campaignId)[0]->layoutId
+            );
+
+            // Set the layout properties
+            $schedule->backgroundColor = $fsLayout->backgroundColor;
+            $schedule->layoutDuration = $fsLayout->duration;
+            $schedule->resolutionId = $this->layoutFactory->getLayoutResolutionId($fsLayout)->resolutionId;
         }
 
         $this->getState()->template = 'schedule-form-edit';
@@ -1720,6 +1748,8 @@ class Schedule extends Base
         $embed = ($sanitizedParams->getString('embed') != null) ? explode(',', $sanitizedParams->getString('embed')) : [];
 
         $schedule = $this->scheduleFactory->getById($id);
+        $oldSchedule = clone $schedule;
+
         $schedule->load([
             'loadScheduleReminders' => in_array('scheduleReminders', $embed),
         ]);
@@ -1732,7 +1762,6 @@ class Schedule extends Base
         $schedule->campaignId = $this->isFullScreenSchedule($schedule->eventTypeId)
             ? $sanitizedParams->getInt('fullScreenCampaignId')
             : $sanitizedParams->getInt('campaignId');
-
         // displayOrder and isPriority: if present but empty (""): set to 0
         // if missing from form: keep existing value (fallback to 0 if unset)
         $schedule->displayOrder = $sanitizedParams->hasParam('displayOrder')
@@ -1841,6 +1870,24 @@ class Schedule extends Base
                 }
             ]);
             $schedule->dataSetParams = $sanitizedParams->getString('dataSetParams');
+        }
+
+        // Get the campaignId for media/playlist events
+        if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
+            $type = $schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT ? 'media' : 'playlist';
+            $id = ($type === 'media') ? $sanitizedParams->getInt('mediaId') : $sanitizedParams->getInt('playlistId');
+
+            // Create a full screen layout for this event
+            $fsLayout = $this->layoutFactory->createFullScreenLayout(
+                $type,
+                $id,
+                $sanitizedParams->getInt('resolutionId'),
+                $sanitizedParams->getString('backgroundColor'),
+                $sanitizedParams->getInt('layoutDuration'),
+            );
+
+            $schedule->campaignId = $this->layoutFactory->getCampaignIdFromLayoutHistory($fsLayout->layoutId);
+            $schedule->parentCampaignId = $schedule->campaignId;
         }
 
         // API request can provide an array of coordinates or valid GeoJSON, handle both cases here.
@@ -2353,7 +2400,7 @@ class Schedule extends Base
 
             $event->setUnmatchedProperty('displayGroupList', $displayGroupList);
             $event->setUnmatchedProperty('recurringEvent', !empty($event->recurrenceType));
-            
+
             if ($this->isSyncEvent($event->eventTypeId)) {
                 $event->setUnmatchedProperty(
                     'displayGroupList',

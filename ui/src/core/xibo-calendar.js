@@ -1100,12 +1100,12 @@ window.setupScheduleForm = function(dialog) {
           },
           {
             type: [7],
-            fieldQuery: '#fullScreen-media',
+            fieldQuery: '#mediaId',
             errorProperty: 'videoImage',
           },
           {
             type: [8],
-            fieldQuery: '#fullScreen-playlist',
+            fieldQuery: '#playlistId',
             errorProperty: 'playlist',
           },
           {
@@ -1528,6 +1528,33 @@ window.setupScheduleForm = function(dialog) {
 
     $(dialog).find('#recurringInfo').prepend($button);
   }
+
+  // Fullscreen schedule fields
+  const updateFSFields = function() {
+    const eventType = $('#eventTypeId', dialog).val();
+    const mediaId = $('#mediaId', dialog).val();
+    const playlistId = $('#playlistId', dialog).val();
+
+    if (eventType == '7' && mediaId) {
+      // If media type, with media
+      // Show all FS controls
+      $('.media-control-option', dialog).removeClass('hidden');
+      $('.fs-control-option', dialog).removeClass('hidden');
+    } else if (eventType == '8' && playlistId) {
+      // If playlist type, with playlist
+      // Show playlist controls, but hide media ones
+      $('.fs-control-option', dialog).removeClass('hidden');
+      $('.media-control-option', dialog).addClass('hidden');
+    } else {
+      $('.media-control-option', dialog).addClass('hidden');
+      $('.fs-control-option', dialog).addClass('hidden');
+    }
+  };
+  // Update when changing target, or event type
+  $('#mediaId, #playlistId, #eventTypeId', dialog)
+    .on('select2:select, change', updateFSFields);
+  // Run on start
+  updateFSFields();
 
   configReminderFields($(dialog));
 };
@@ -2640,25 +2667,6 @@ const setupSelectForSchedule = function(dialog) {
       });
     }
   }
-
-  $('#mediaId, #playlistId', dialog).on('select2:select', function(event) {
-    let hasFullScreenLayout = false;
-    if (event.params.data.data !== undefined) {
-      hasFullScreenLayout = event.params.data.data[0].hasFullScreenLayout;
-    } else if (event.params.data.hasFullScreenLayout !== undefined) {
-      hasFullScreenLayout = event.params.data.hasFullScreenLayout;
-    }
-
-    if (hasFullScreenLayout) {
-      $('.no-full-screen-layout').css('display', 'none');
-    } else {
-      if ($(event.currentTarget).attr('id') === 'mediaId') {
-        $('.no-full-screen-layout').css('display', '');
-      } else {
-        $('.no-full-screen-layout.media-playlist-control').css('display', '');
-      }
-    }
-  });
 
   // Sync group
   $('#syncGroupId', dialog).on('select2:select', function(event) {
