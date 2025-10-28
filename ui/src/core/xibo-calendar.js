@@ -21,13 +21,14 @@
 
 // Global calendar object
 window.calendar = undefined;
-let events = [];
+window.calendarEvents = [];
+window.agendaCalendar = undefined;
+window.agendaEvents = [];
+window.getJsonRequestControl = null;
 let mymap;
 let mymapmarker;
 
 $(function() {
-  let getJsonRequestControl = null;
-
   // Set a listener for popover clicks
   //  http://stackoverflow.com/questions/11703093/how-to-dismiss-a-twitter-bootstrap-popover-by-clicking-outside
   $('body').on('click', function(e) {
@@ -251,33 +252,6 @@ $(function() {
     $valueLabel.append($valueInput);
   }
 
-  // Set up the navigational controls
-  $('.btn-group button[data-calendar-nav]').each(function(_idx, el) {
-    const $this = $(el);
-    $this.on('click', function() {
-      calendar.navigate($this.data('calendar-nav'));
-    });
-  });
-
-  $('.btn-group button[data-calendar-view]').each(function(_idx, el) {
-    const $this = $(el);
-    $this.on('click', function() {
-      calendar.view($this.data('calendar-view'));
-      $('#range').val($this.data('calendar-view'));
-    });
-  });
-
-  $('a[data-toggle="tab"].schedule-nav').on('shown.bs.tab', function(e) {
-    const activeTab = $(e.target).attr('href');
-    if (activeTab === '#calendar-view') {
-      $('#range').trigger('change');
-    } else {
-      if ($('#range').val() === 'agenda') {
-        $('#range').val('day').trigger('change');
-      }
-    }
-  });
-
   // Calendar is initialised without any event_source
   // (that is changed when the selector is used)
   if (($('#Calendar').length > 0)) {
@@ -302,51 +276,17 @@ $(function() {
         'date',
         moment($('#dateInput input[data-input]').val()),
       );
+
+      updateRangeFilter(
+        $('#range'),
+        $('#fromDt'),
+        $('#toDt'),
+        navigateToCalendarDate,
+        {date: $('#dateInput input[data-input]').val()},
+      );
     };
 
     $('#range').on('change', function() {
-      if (calendar != undefined) {
-        let range = $('#range').val();
-        const isPast = range.includes('last');
-
-        if (range === 'custom') {
-          $('#fromDt, #toDt').on('change', function() {
-            navigateToCalendarDate();
-            const from = moment(
-              moment($('#fromDt').val())
-                .startOf('day')
-                .format(systemDateFormat),
-            );
-            const to = moment(
-              moment($('#toDt').val())
-                .startOf('day')
-                .format(systemDateFormat),
-            );
-
-            const diff = to.diff(from, 'days');
-
-            if (diff < 1) {
-              calendar.options.view === 'agenda' ?
-                calendar.view('agenda') :
-                calendar.view('day');
-            } else if (diff >= 1 && diff <= 7) {
-              calendar.view('week');
-            } else if (diff > 7 && diff <= 31) {
-              calendar.view('month');
-            } else {
-              calendar.view('year');
-            }
-          });
-        } else {
-          range = isPast ? range.replace('last', '') : range;
-          calendar.view(range);
-        }
-        // for agenda, switch to calendar tab.
-        if (range === 'agenda') {
-          $('#calendar-tab').trigger('click');
-        }
-      }
-
       updateRangeFilter(
         $('#range'),
         $('#fromDt'),
@@ -394,69 +334,12 @@ $(function() {
       false, // clear button
     );
 
-    // Location filter init
-    const $map = $('.cal-event-location-map #geoFilterAgendaMap');
-
-    // Get location button
-    $('#getLocation').off().on('click', function(ev) {
-      const $self = $(ev.currentTarget);
-
-      // Disable button
-      $self.prop('disabled', true);
-
-      navigator.geolocation.getCurrentPosition(function(location) { // success
-        // Populate location fields
-        $('#geoLatitude').val(location.coords.latitude).change();
-        $('#geoLongitude').val(location.coords.longitude).change();
-
-        // Reenable button
-        $self.prop('disabled', false);
-
-        // Redraw map
-        generateFilterGeoMap();
-      }, function error(err) { // error
-        console.warn('ERROR(' + err.code + '): ' + err.message);
-
-        // Reenable button
-        $self.prop('disabled', false);
-      }, { // options
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0,
-      });
-    });
-
-    // Location map button
-    $('#toggleMap').off().on('click', function() {
-      $map.toggleClass('d-none');
-
-      if (!$map.hasClass('d-none')) {
-        generateFilterGeoMap();
-      }
-    });
-
-    // Clear location button
-    $('#clearLocation').off().on('click', function() {
-      // Populate location fields
-      $('#geoLatitude').val('').change();
-      $('#geoLongitude').val('').change();
-
-      if (!$map.hasClass('d-none')) {
-        generateFilterGeoMap();
-      }
-    });
-
-    // Change events reloads the calendar view and map
-    $('#geoLatitude, #geoLongitude').off().change(_.debounce(function() {
-      calendar.view();
-    }, 400));
-
     // Calendar options
     const options = {
       time_start: '00:00',
       time_end: '00:00',
       events_source: function() {
-        return events;
+        return calendarEvents;
       },
       view: 'month',
       tmpl_path: function(name) {
@@ -477,407 +360,23 @@ $(function() {
       },
       tmpl_cache: true,
       onBeforeEventsLoad: function(done) {
-        const calendarOptions = $('#CalendarContainer').data();
-        const $calendarErrorMessage = $('#calendar-error-message');
-
-        // Append display groups and layouts
-        const isShowAll = $('#showAll').is(':checked');
-
-        // Enable or disable the display list
-        // according to whether show all is selected
-        // we do this before we serialise because
-        // serialising a disabled list gives nothing
-        $('#DisplayList, #DisplayGroupList').prop('disabled', isShowAll);
-
-        if (this.options.view !== 'agenda') {
-          $('.cal-event-agenda-filter, ' +
-            '.xibo-agenda-calendar-controls, ' +
-            '#btn-month-view').hide();
-          $('#btn-agenda-view').show();
-          $('.non-agenda-filter').find('input, select').prop('disabled', false);
-
-          // Serialise
-          const displayGroups =
-            $('select[name="displayGroupIds[]"').serialize();
-          const displaySpecificGroups =
-            $('select[name="displaySpecificGroupIds[]"').serialize();
-          const displayLayouts = $('#campaignIdFilter').serialize();
-          const eventTypes = $('#eventTypeId').serialize();
-          const geoAware = $('#geoAware').serialize();
-          const recurring = $('#recurring').serialize();
-          const name = $('#name').serialize();
-          const nameRegEx =
-            'useRegexForName=' + $('#useRegexForName').is('checked');
-          const nameLogicalOperator = $('#logicalOperatorName').serialize();
-
-          !displayGroups && !displayLayouts && !displaySpecificGroups ?
-            $calendarErrorMessage.show() :
-            $calendarErrorMessage.hide();
-
-          let url = calendarOptions.eventSource;
-
-          // Append the selected filters
-          url += '?' + displayLayouts + '&' + eventTypes + '&' + geoAware +
-            '&' + recurring + '&' + name +
-            '&' + nameRegEx + '&' + nameLogicalOperator;
-
-          // Should we append displays?
-          if (
-            !displayGroups && !displaySpecificGroups && displayLayouts !== ''
-          ) {
-            // Ignore the display list
-            url += '&' + 'displayGroupIds[]=-1';
-          } else if (displayGroups !== '' || displaySpecificGroups !== '') {
-            // Append display list
-            url += '&' + displayGroups + '&' + displaySpecificGroups;
-          }
-
-          events = [];
-
-          // Populate the events array via AJAX
-          const params = {
-            from: moment(this.options.position.start.getTime())
-              .format(systemDateFormat),
-            to: moment(this.options.position.end.getTime())
-              .format(systemDateFormat),
-          };
-
-          // If there is already a request, abort it
-          if (getJsonRequestControl) {
-            getJsonRequestControl.abort();
-          }
-
-          $('#calendar-progress').addClass('show');
-
-          getJsonRequestControl = $.getJSON(url, params)
-            .done(function(data) {
-              events = data.result;
-
-              if (done != undefined) {
-                done();
-              }
-
-              calendar._render();
-
-              // Hook up any pop-overs (for small events)
-              $('[data-toggle="popover"]').popover({
-                trigger: 'manual',
-                html: true,
-                placement: 'bottom',
-                content: function() {
-                  return $(this).html();
-                },
-              }).on('mouseenter', function(ev) {
-                const self = ev.currentTarget;
-
-                // Hide all other popover
-                $('[data-toggle="popover"]').not(self).popover('hide');
-
-                // Show this popover
-                $(self).popover('show');
-
-                // Hide popover when mouse leaves it
-                $('.popover').off('mouseleave').on('mouseleave', function() {
-                  $(self).popover('hide');
-                });
-              }).on('shown.bs.popover', function(ev) {
-                const source = $(ev.currentTarget);
-                const popover = source.attr('aria-describedby');
-
-                $('#' + popover + ' a').on('click', function(e) {
-                  e.preventDefault();
-                  XiboFormRender(source);
-                  source.popover('hide');
-                });
-              });
-
-              $('#calendar-progress').removeClass('show');
-            })
-            .fail(function(res) {
-              $('#calendar-progress').removeClass('show');
-
-              if (done != undefined) {
-                done();
-              }
-
-              calendar._render();
-
-              if (res.statusText != 'abort') {
-                toastr.error(translations.failure);
-                console.error(res);
-              }
-            });
-        } else {
-          // Show time slider on agenda view and call
-          // the calendar view on slide stop event
-          $(
-            '.cal-event-agenda-filter, ' +
-            '.xibo-agenda-calendar-controls, ' +
-            '#btn-month-view',
-          ).show();
-          $('#btn-agenda-view').hide();
-          $('.non-agenda-filter').find('input, select').prop('disabled', true);
-
-          // agenda has it is own error conditions.
-          $calendarErrorMessage.hide();
-
-          const $timePicker = $('#timePicker');
-
-          const momentNow = moment().tz ? moment().tz(timezone) : moment();
-
-          // Create slider ticks
-          const ticks = [];
-          const ticksLabels = [];
-          const ticksPositions = [];
-          for (let i = 0; i <= 1440; i += 120) {
-            // Last step get one less minute
-            const minutes = i === 1440 ? 1439 : i;
-            ticks.push(minutes);
-            ticksLabels.push(
-              momentNow.clone().startOf('day').add(minutes, 'minutes')
-                .format(jsTimeFormat),
-            );
-            ticksPositions.push(i / 1440 * 100);
-          }
-
-          $timePicker.slider({
-            value: (momentNow.hour() * 60) + momentNow.minute(),
-            tooltip: 'always',
-            ticks: ticks,
-            ticks_labels: ticksLabels,
-            ticks_positions: ticksPositions,
-            formatter: function(value) {
-              return moment().startOf('day').minute(value).format(jsTimeFormat);
-            },
-          }).off('slideStop').on('slideStop', function(ev) {
-            calendar.view();
-          });
-
-          $('.time-picker-step-btn').off().on('click', function(ev) {
-            $timePicker.slider(
-              'setValue',
-              $timePicker.slider('getValue') + $(ev.currentTarget).data('step'),
-            );
-            calendar.view();
-          });
-
-          // Get selected display groups
-          let selectedDisplayGroup = $('.cal-context').data().selectedTab;
-          const displayGroupsList = [];
-          let chooseAllDisplays = false;
-
-          if (!isShowAll) {
-            $('#DisplayList, #DisplayGroupList').prop('disabled', false);
-
-            // Find selected display group and create a
-            // display group list used to create tabs
-            $(
-              'select[name="displayGroupIds[]"] option, ' +
-              'select[name="displaySpecificGroupIds[]"] option',
-            )
-              .each(function(_idx, el) {
-                const $self = $(el);
-
-                // If the all option is selected
-                if ($self.val() == -1 && $self.is(':selected')) {
-                  chooseAllDisplays = true;
-                  return true;
-                }
-
-                if ($self.is(':selected') || chooseAllDisplays) {
-                  displayGroupsList.push({
-                    id: $self.val(),
-                    name: $self.html(),
-                    isDisplaySpecific: $self.attr('type'),
-                  });
-
-                  if (typeof selectedDisplayGroup == 'undefined') {
-                    selectedDisplayGroup = $self.val();
-                  }
-                }
-              });
-          }
-
-          // Sort display group list by name
-          displayGroupsList.sort(function(a, b) {
-            const nameA =
-              a.name.toLowerCase(); const nameB = b.name.toLowerCase();
-            // sort string ascending
-            if (nameA < nameB) {
-              return -1;
-            }
-            if (nameA > nameB) {
-              return 1;
-            }
-
-            return 0; // default return value (no sorting)
-          });
-
-          const url =
-            calendarOptions.agendaLink.replace(':id', selectedDisplayGroup);
-
-          const dateMoment =
-            moment(this.options.position.start.getTime() / 1000, 'X');
-          const timeFromSlider =
-            ($('#timePickerSlider').length) ?
-              $('#timePicker').slider('getValue') : 0;
-          const timeMoment =
-            moment(timeFromSlider * 60, 'X');
-
-          // Add hour to date to get the selected date
-          const dateSelected = moment(dateMoment + timeMoment);
-
-          // Populate the events array via AJAX
-          const params = {
-            date: dateSelected.format(systemDateFormat),
-          };
-
-          // if the result are empty create a empty object and reset the results
-          if (jQuery.isEmptyObject(events['results'])) {
-            // events let must be an array for
-            // compatibility with the previous implementation
-            events = [];
-            events['results'] = {};
-          }
-
-          // Save displaygroup list and the selected display
-          events['displayGroupList'] = displayGroupsList;
-          events['selectedDisplayGroup'] = selectedDisplayGroup;
-
-          // Clean error message
-          events['errorMessage'] = '';
-
-          // Clean cache/results if its requested by the options
-          if (calendar.options['clearCache'] == true) {
-            events['results'] = {};
-          }
-
-          // If there is already a request, abort it
-          if (getJsonRequestControl) {
-            getJsonRequestControl.abort();
-          }
-
-          // 0 - If all is selected, force the user to specify the displaygroups
-          if (isShowAll) {
-            events['errorMessage'] = 'all_displays_selected';
-
-            if (done != undefined) {
-              done();
-            }
-
-            calendar._render();
-          } else if (
-            displayGroupsList == null ||
-            Array.isArray(displayGroupsList) &&
-            displayGroupsList.length == 0
-          ) {
-            // 1 - if there are no displaygroups selected
-            events['errorMessage'] = 'display_not_selected';
-
-            if (done != undefined) {
-              done();
-            }
-
-            calendar._render();
-          } else if (
-            !jQuery.isEmptyObject(events['results'][selectedDisplayGroup]) &&
-            events['results'][selectedDisplayGroup]['request_date'] ==
-            params.date &&
-            events['results'][selectedDisplayGroup]['geoLatitude'] ==
-            $('#geoLatitude').val() &&
-            events['results'][selectedDisplayGroup]['geoLongitude'] ==
-            $('#geoLongitude').val()
-          ) {
-            // 2 - Use cache if the element was already
-            // saved for the requested date
-            if (done != undefined) {
-              done();
-            }
-
-            calendar._render();
-          } else {
-            $('#calendar-progress').addClass('show');
-
-            // 3 - make request to get the data for the events
-            getJsonRequestControl = $.getJSON(url, params)
-              .done(function(data) {
-                let noEvents = true;
-
-                if (
-                  !jQuery.isEmptyObject(data.data) &&
-                  data.data.events != undefined &&
-                  data.data.events.length > 0
-                ) {
-                  events['results'][String(selectedDisplayGroup)] = data.data;
-                  // eslint-disable-next-line max-len
-                  events['results'][String(selectedDisplayGroup)]['request_date'] = params.date;
-
-                  noEvents = false;
-
-                  if (
-                    $('#geoLatitude').val() != undefined &&
-                    $('#geoLatitude').val() != '' &&
-                    $('#geoLongitude').val() != undefined &&
-                    $('#geoLongitude').val() != ''
-                  ) {
-                    // eslint-disable-next-line max-len
-                    events['results'][String(selectedDisplayGroup)]['geoLatitude'] =
-                      $('#geoLatitude').val();
-                    // eslint-disable-next-line max-len
-                    events['results'][String(selectedDisplayGroup)]['geoLongitude'] =
-                      $('#geoLongitude').val();
-
-                    events['results'][String(selectedDisplayGroup)]['events'] =
-                      filterEventsByLocation(
-                        // eslint-disable-next-line max-len
-                        events['results'][String(selectedDisplayGroup)]['events'],
-                      );
-
-                    noEvents = (data.data.events.length <= 0);
-                  }
-                }
-
-                if (noEvents) {
-                  events['results'][String(selectedDisplayGroup)] = {};
-                  events['errorMessage'] = 'no_events';
-                }
-
-                if (done != undefined) {
-                  done();
-                }
-
-                calendar._render();
-
-                $('#calendar-progress').removeClass('show');
-              })
-              .fail(function(res) {
-                // Deal with the failed request
-
-                if (done != undefined) {
-                  done();
-                }
-
-                if (res.statusText != 'abort') {
-                  events['errorMessage'] = 'request_failed';
-                }
-
-                calendar._render();
-
-                $('#calendar-progress').removeClass('show');
-              });
-          }
+        if (typeof scheduleEvents === 'undefined') {
+          console.log('Events not loaded, stop here!');
+          return;
+        }
+
+        // Generate calendar events
+        window.calendarEvents = generateCalendarEvents(
+          scheduleEvents,
+          this.options.position.start.getTime(),
+          this.options.position.end.getTime(),
+        );
+
+        if (done != undefined) {
+          done();
         }
       },
       onAfterEventsLoad: function(events) {
-        if (this.options.view == 'agenda') {
-          // When agenda panel is ready, turn tables into datatables with paging
-          $('.agenda-panel').ready(function() {
-            $('.agenda-table-layouts').DataTable({
-              searching: false,
-            });
-          });
-        }
-
         if (!events) {
           return;
         }
@@ -898,8 +397,84 @@ $(function() {
           );
         }
 
+        // Manage calendar numbers and Agenda open
+        $('.calendar-view .cal-month-day-number').each(function(_idx, el) {
+          const $el = $(el);
+          const date = $el.data('calDate');
+
+          // If no events on that day
+          // or agenda view not enabled
+          if (
+            $el.siblings('.events-list').length === 0 ||
+            userAgendaViewEnabled != '1'
+          ) {
+            $el.removeAttr('title').off('click').css('cursor', 'auto');
+          } else {
+            $el.attr('title', translations.schedule.calendar.openAgenda)
+              .css('cursor', 'pointer')
+              .off('click').on('click', function(e) {
+                e.stopPropagation();
+                openAgendaModal(date);
+              });
+          }
+        });
+
+        $('.calendar-view').on('calendar.eventListReady',
+          function(e, dateValue) {
+            // Show Agenda button if feature is enabled
+            if (userAgendaViewEnabled == '1') {
+              $(e.currentTarget).find('.cal-agenda-button')
+                .addClass('is-visible')
+                .off('click.agenda')
+                .on('click.agenda', function(e) {
+                  e.stopPropagation();
+                  openAgendaModal(dateValue);
+                });
+            }
+          });
+
+        // Hook up any pop-overs (for small events)
+        $('[data-toggle="popover"]').popover({
+          trigger: 'manual',
+          html: true,
+          placement: 'bottom',
+          content: function() {
+            return $(this).html();
+          },
+        }).on('mouseenter', function(ev) {
+          const self = ev.currentTarget;
+
+          // Hide all other popover
+          $('[data-toggle="popover"]').not(self).popover('hide');
+
+          // Show this popover
+          $(self).popover('show');
+
+          // Hide popover when mouse leaves it
+          $('.popover').off('mouseleave').on('mouseleave', function() {
+            $(self).popover('hide');
+          });
+        }).on('shown.bs.popover', function(ev) {
+          const source = $(ev.currentTarget);
+          const popover = source.attr('aria-describedby');
+
+          $('#' + popover + ' a').on('click', function(e) {
+            e.preventDefault();
+            XiboFormRender(source);
+            source.popover('hide');
+          });
+        });
+
         if (typeof this.getTitle === 'function') {
-          $('h1.page-header').text(this.getTitle());
+          let title = this.getTitle();
+
+          if ($('#range').val() == 'custom') {
+            const dateFormat = 'HH:mm D MMMM YYYY';
+            title = translations.schedule.calendar.customFromTo
+              .replace(':from', moment($('#fromDt').val()).format(dateFormat))
+              .replace(':to', moment($('#toDt').val()).format(dateFormat));
+          }
+          $('h1.page-header').text(title);
         }
 
         $('.btn-group button').removeClass('active');
@@ -910,67 +485,133 @@ $(function() {
 
     options.type = calendarOptions.calendarType;
     calendar = $('#Calendar').calendar(options);
-
-    // Set event when clicking on a tab, to refresh the view
-    $('.cal-context').on('click', 'a[data-toggle="tab"]', function(e) {
-      $('.cal-context').data().selectedTab = $(e.currentTarget).data('id');
-      calendar.view();
-    });
-
-    // When selecting a layout row, create a Breadcrumb Trail
-    // and select the correspondent Display Group(s) and the Campaign(s)
-    $('.cal-context').on('click', 'tbody tr', function(e) {
-      const $self = $(e.currentTarget);
-      const alreadySelected = $self.hasClass('selected');
-
-      // Clean all selected elements
-      $('.cal-event-breadcrumb-trail').hide();
-      $('.cal-context tbody tr').removeClass('selected');
-      $('.cal-context tbody tr').removeClass('selected-linked');
-
-      // Remove previous layout preview
-      destroyMiniLayoutPreview();
-
-      // If the element was already selected return
-      // so that it can deselect everything
-      if (alreadySelected) {
-        return;
-      }
-
-      // If the click was in a layout table row create the breadcrumb trail
-      if ($self.closest('table').data('type') == 'layouts') {
-        $('.cal-event-breadcrumb-trail').show();
-
-        // Clean div content
-        $('.cal-event-breadcrumb-trail #content').html('');
-
-        // Get the template and render it on the div
-        $('.cal-event-breadcrumb-trail #content').append(
-          calendar._breadcrumbTrail(
-            $self.data('elemId'),
-            events,
-            $self.data('eventId'),
-          ),
-        );
-
-        // Create mini layout preview
-        createMiniLayoutPreview(
-          layoutPreviewUrl.replace(':id', $self.data('elemId')),
-        );
-
-        // Initialize container for the Schedule modal handling
-        XiboInitialise('#CalendarContainer');
-      }
-
-      // Select the clicked element and the linked elements
-      agendaSelectLinkedElements(
-        $self.closest('table').data('type'),
-        $self.data('elemId'), events,
-        $self.data('eventId'),
-      );
-    });
   }
 });
+
+
+// Generate all calendar events ( and reccurent events )
+// based on schedule events
+function generateCalendarEvents(scheduleEvents, viewStartMs, viewEndMs) {
+  const allOccurrences = [];
+  const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+
+  const generateRecurrences = (sourceEv) => {
+    if (!sourceEv.recurrenceType || !sourceEv.recurrenceDetail) {
+      return [];
+    }
+
+    const generated = [];
+    const interval = parseInt(sourceEv.recurrenceDetail, 10);
+    if (interval <= 0) return [];
+
+    const originalStart = moment(sourceEv.fromDt * 1000);
+    const duration = moment.duration((sourceEv.toDt - sourceEv.fromDt) * 1000);
+    const rangeEnd = sourceEv.recurrenceRange ?
+      moment(sourceEv.recurrenceRange * 1000) :
+      moment('9999-12-31'); // Infinity
+
+    let currentMoment = originalStart.clone();
+
+    while (
+      currentMoment.isBefore(moment(viewEndMs)) &&
+      currentMoment.isBefore(rangeEnd)
+    ) {
+      const isWeekly = sourceEv.recurrenceType === 'Week' &&
+        sourceEv.recurrenceRepeatsOn;
+
+      if (isWeekly) {
+        const days = sourceEv.recurrenceRepeatsOn.split(',').map(Number);
+        const weekStart = currentMoment.clone().startOf('isoWeek');
+
+        for (let i = 0; i < 7; i++) {
+          const dayInWeek = weekStart.clone().add(i, 'days');
+          if (!days.includes(dayInWeek.isoWeekday())) continue;
+
+          const occStart = dayInWeek.set({
+            hour: originalStart.hour(),
+            minute: originalStart.minute(),
+            second: originalStart.second(),
+          });
+
+          if (occStart.isAfter(originalStart) && occStart.isBefore(rangeEnd)) {
+            const clone = deepClone(sourceEv);
+            clone.fromDt = occStart.unix();
+            clone.toDt = occStart.clone().add(duration).unix();
+            generated.push(clone);
+          }
+        }
+
+        currentMoment.add(interval, 'weeks');
+        continue;
+      }
+
+      const unitMap =
+        {Minute: 'm', Hour: 'h', Day: 'd', Month: 'M', Year: 'y'};
+      const next = currentMoment.clone()
+        .add(interval, unitMap[sourceEv.recurrenceType]);
+
+      if (!next || next.isSameOrBefore(currentMoment)) break;
+
+      currentMoment = next;
+
+      if (currentMoment.isBefore(rangeEnd)) {
+        const clone = deepClone(sourceEv);
+        clone.fromDt = currentMoment.unix();
+        clone.toDt = currentMoment.clone().add(duration).unix();
+        generated.push(clone);
+      }
+    }
+    return generated;
+  };
+
+  scheduleEvents.forEach((sourceEv) => {
+    allOccurrences.push(sourceEv);
+    if (sourceEv.recurringEvent) {
+      allOccurrences.push(...generateRecurrences(sourceEv));
+    }
+  });
+
+  const formatCalendarEvent = (rawEv) => {
+    const startMs = rawEv.fromDt * 1000;
+    const endMs = rawEv.toDt * 1000;
+
+    const editButton =
+      rawEv.buttons.find((b) => b.id === 'schedule_button_edit');
+    const eventUrl = editButton ?
+      editButton.url :
+      `/schedule/form/edit/${rawEv.eventId}`;
+    const titleText = translations.schedule.calendar.eventOnDisplay
+      .replace(':event', rawEv.parentCampaignName || rawEv.campaign)
+      .replace(
+        ':display',
+        rawEv.displayGroupList || rawEv.displayGroups[0].displayGroup,
+      );
+
+    return {
+      id: rawEv.eventId,
+      title: titleText,
+      url: eventUrl,
+      start: startMs,
+      end: endMs,
+      sameDay: moment(startMs).isSame(moment(endMs), 'day'),
+      editable: rawEv.isEditable,
+      event: rawEv,
+      scheduleEvent: {
+        fromDt: moment(startMs).format(jsDateFormat),
+        toDt: moment(endMs).format(jsDateFormat),
+      },
+      recurringEvent: rawEv.recurringEvent,
+    };
+  };
+
+  return allOccurrences
+    .filter((ev) => {
+      const startMs = ev.fromDt * 1000;
+      const endMs = ev.toDt * 1000;
+      return startMs < viewEndMs && endMs > viewStartMs;
+    })
+    .map(formatCalendarEvent);
+}
 
 // Creates a readonly text input for display and a hidden input for submission.
 function createReadonlyAndHiddenFields(
@@ -1317,12 +958,12 @@ window.setupScheduleForm = function(dialog) {
           const curStep = $(dialog).find('#' + steps.data('active'));
           // If sync event and step 1, move to step 3
           const nextStep =
-          (
-            $(curStep).data('step') === 1 &&
-            $('#eventTypeId', dialog).val() === '9'
-          ) ?
-            'schedule-step-3' :
-            curStep.data('next');
+            (
+              $(curStep).data('step') === 1 &&
+              $('#eventTypeId', dialog).val() === '9'
+            ) ?
+              'schedule-step-3' :
+              curStep.data('next');
           const nextStepWizard =
             steps.find('a[href=\'#' + nextStep + '\']');
 
@@ -1841,7 +1482,7 @@ const processScheduleFormElements = function(el, dialog) {
 
       $('.sync-group-control', dialog).css('display', syncGroupDisplay);
 
-      if (fieldVal != 9 ) {
+      if (fieldVal != 9) {
         $('.sync-group-content-selector', dialog).css('display', 'none');
       }
       $('.display-group-control', dialog).css('display', displayGroupDisplay);
@@ -2176,6 +1817,487 @@ const scheduleEvaluateRelativeDateTime = function($form) {
       true,
     );
   }
+};
+
+const openAgendaModal = function(date) {
+  if (userAgendaViewEnabled != '1') {
+    console.error('Feature not enabled: Agenda view');
+    return;
+  }
+
+  // Create modal
+  const dialog = bootbox.dialog({
+    title: translations.schedule.calendar.agendaView,
+    message: `<div id="agendaCalendar"></div>`,
+    className: 'agenda-view-modal',
+    closeButton: true,
+    buttons: {
+      close: {
+        label: translations.schedule.calendar.closeAgendaView,
+        className: 'btn-primary',
+      },
+    },
+  }).attr('data-test', 'agendaViewModal');
+
+  // Destroy calendar on close
+  dialog.on('hidden.bs.modal', function() {
+    window.agendaCalendar = null;
+
+    destroyMiniLayoutPreview();
+  });
+
+  if (($('.agenda-view-modal #agendaCalendar').length > 0)) {
+    const calendarOptions = $('#CalendarContainer').data();
+
+    // Add filters
+    $('.agenda-view-modal .modal-body').prepend(
+      templates.calendar.agendaFilter({
+        trans: translations.schedule.calendar.agendaFilters,
+        defaultLat: calendarOptions.defaultLat,
+        defaultLong: calendarOptions.defaultLong,
+      }),
+    );
+
+    // Location filter init
+    const $map = $('.cal-event-location-map #geoFilterAgendaMap');
+
+    // Get location button
+    $('#getLocation').off('click.getLoc').on('click.getLoc', function(ev) {
+      const $self = $(ev.currentTarget);
+
+      // Disable button
+      $self.prop('disabled', true);
+
+      navigator.geolocation.getCurrentPosition(function(location) { // success
+        // Populate location fields
+        $('#geoLatitude').val(location.coords.latitude).trigger('change');
+        $('#geoLongitude').val(location.coords.longitude).trigger('change');
+
+        // Reenable button
+        $self.prop('disabled', false);
+
+        // Redraw map
+        generateFilterGeoMap();
+      }, function error(err) { // error
+        console.warn('ERROR(' + err.code + '): ' + err.message);
+
+        // Reenable button
+        $self.prop('disabled', false);
+      }, { // options
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0,
+      });
+    });
+
+    // Location map button
+    $('#toggleMap').off('click.toggleMap').on('click.toggleMap', function() {
+      $map.toggleClass('d-none');
+
+      if (!$map.hasClass('d-none')) {
+        generateFilterGeoMap();
+      }
+    });
+
+    // Clear location button
+    $('#clearLocation').off('click.genMap').on('click.genMap', function() {
+      // Populate location fields
+      $('#geoLatitude').val('').trigger('change');
+      $('#geoLongitude').val('').trigger('change');
+
+      if (!$map.hasClass('d-none')) {
+        generateFilterGeoMap();
+      }
+    });
+
+    // Change events reloads the calendar view and map
+    $('#geoLatitude, #geoLongitude, #showTimeline').off('change.agendaFilter')
+      .on('change.agendaFilter', _.debounce(function() {
+        agendaCalendar.view();
+      }, 400));
+
+    // Calendar options
+    const options = {
+      time_start: '00:00',
+      time_end: '00:00',
+      day: date,
+      events_source: function() {
+        return agendaEvents;
+      },
+      view: 'agenda',
+      tmpl_path: function(name) {
+        // Create underscore template
+        // with translations and add to body
+        if ($('#calendar-template-' + name).length === 0) {
+          const $template = $('<div id="calendar-template-' + name + '">');
+
+          $template.text(templates.calendar[name]({
+            trans: translations.schedule.calendar,
+          })).hide();
+          $template.appendTo('body');
+        }
+
+        // Return name only
+        // ( to work the same way in calendar and calendar-jalali)
+        return 'calendar-template-' + name;
+      },
+      tmpl_cache: true,
+      onBeforeEventsLoad: function(done) {
+        // If there is already a request, abort it
+        if (window.getJsonRequestControl) {
+          return;
+        }
+
+        const $calendarErrorMessage = $('#calendar-error-message');
+        const agendaCalendar = this;
+
+        // Show time slider on agenda view and call
+        // the calendar view on slide stop event
+        $(
+          '.cal-event-agenda-filter, ' +
+          '.xibo-agenda-calendar-controls, ' +
+          '#btn-month-view',
+        ).show();
+        $('#btn-agenda-view').hide();
+        $('.non-agenda-filter').find('input, select').prop('disabled', true);
+
+        // agenda has it is own error conditions.
+        $calendarErrorMessage.hide();
+
+        const $timePicker = $('#timePicker');
+        const momentNow = moment().tz ? moment().tz(timezone) : moment();
+
+        // Create slider ticks
+        const ticks = [];
+        const ticksLabels = [];
+        const ticksPositions = [];
+        for (let i = 0; i <= 1440; i += 120) {
+          // Last step get one less minute
+          const minutes = i === 1440 ? 1439 : i;
+          ticks.push(minutes);
+          ticksLabels.push(
+            momentNow.clone().startOf('day').add(minutes, 'minutes')
+              .format(jsTimeFormat),
+          );
+          ticksPositions.push(i / 1440 * 100);
+        }
+
+        $timePicker.slider({
+          value: (momentNow.hour() * 60) + momentNow.minute(),
+          tooltip: 'always',
+          ticks: ticks,
+          ticks_labels: ticksLabels,
+          ticks_positions: ticksPositions,
+          formatter: function(value) {
+            return moment().startOf('day').minute(value).format(jsTimeFormat);
+          },
+        }).off('slideStop').on('slideStop', function(ev) {
+          agendaCalendar.view();
+        });
+
+        $('.time-picker-step-btn').off('click.agenda')
+          .on('click.agenda', function(ev) {
+            $timePicker.slider(
+              'setValue',
+              $timePicker.slider('getValue') + $(ev.currentTarget).data('step'),
+            );
+            agendaCalendar.view();
+          });
+
+        // Get selected display groups
+        let selectedDisplayGroup = $('.cal-context').data().selectedTab;
+        const displayGroupsList = [];
+        let chooseAllDisplays = false;
+
+        $('#DisplayList, #DisplayGroupList').prop('disabled', false);
+
+        // Find selected display group and create a
+        // display group list used to create tabs
+        $(
+          'select[name="displayGroupIds[]"] option, ' +
+          'select[name="displaySpecificGroupIds[]"] option',
+        )
+          .each(function(_idx, el) {
+            const $self = $(el);
+
+            // If the all option is selected
+            if ($self.val() == -1 && $self.is(':selected')) {
+              chooseAllDisplays = true;
+              return true;
+            }
+
+            if ($self.is(':selected') || chooseAllDisplays) {
+              displayGroupsList.push({
+                id: $self.val(),
+                name: $self.html(),
+                isDisplaySpecific: $self.attr('type'),
+              });
+            }
+          });
+
+        // If there are no selected displays
+        // use displays from events
+        if (displayGroupsList.length === 0) {
+          scheduleEvents.forEach((ev) => {
+            ev.displayGroups.forEach((dp) => {
+              if (!displayGroupsList.find(
+                (dpl) => dpl.id == dp.displayGroupId)
+              ) {
+                displayGroupsList.push({
+                  id: dp.displayGroupId,
+                  name: dp.displayGroup,
+                  isDisplaySpecific: dp.isDisplaySpecific,
+                });
+              }
+            });
+          });
+        }
+
+        // If no selected display on tab, select 1st from all displays
+        if (typeof selectedDisplayGroup == 'undefined') {
+          selectedDisplayGroup = displayGroupsList[0].id;
+        }
+
+        // Sort display group list by name
+        displayGroupsList.sort(function(a, b) {
+          const nameA =
+            a.name.toLowerCase(); const nameB = b.name.toLowerCase();
+          // sort string ascending
+          if (nameA < nameB) {
+            return -1;
+          }
+          if (nameA > nameB) {
+            return 1;
+          }
+
+          return 0; // default return value (no sorting)
+        });
+
+        const url =
+          calendarOptions.agendaLink.replace(':id', selectedDisplayGroup);
+
+        const dateMoment =
+          moment(this.options.position.start.getTime() / 1000, 'X');
+        const timeFromSlider =
+          ($('#timePickerSlider').length) ?
+            $('#timePicker').slider('getValue') : 0;
+        const timeMoment =
+          moment(timeFromSlider * 60, 'X');
+
+        // Add hour to date to get the selected date
+        const dateSelected = moment(dateMoment + timeMoment);
+
+        // Populate the events array via AJAX
+        const params = {
+          singlePointInTime: $('#showTimeline').is(':checked') ? 1 : 0,
+        };
+        if (params.singlePointInTime) {
+          params.date = dateSelected.format(systemDateFormat);
+        } else {
+          params.startDate = dateMoment.format(systemDateFormat);
+          params.endDate =
+            dateMoment.clone().endOf('day').format(systemDateFormat);
+        }
+
+        // if the result are empty create a empty object and reset the results
+        if (jQuery.isEmptyObject(agendaEvents['results'])) {
+          // events let must be an array for
+          // compatibility with the previous implementation
+          agendaEvents = [];
+          agendaEvents['results'] = {};
+        }
+
+        // Save displaygroup list and the selected display
+        agendaEvents['displayGroupList'] = displayGroupsList;
+        agendaEvents['selectedDisplayGroup'] = selectedDisplayGroup;
+
+        // Clean error message
+        agendaEvents['errorMessage'] = '';
+
+        // Clean cache/results if its requested by the options
+        if (calendar.options['clearCache'] == true) {
+          agendaEvents['results'] = {};
+        }
+
+        $('#calendar-progress').addClass('show');
+
+        // 3 - make request to get the data for the events
+        window.getJsonRequestControl = $.getJSON(url, params)
+          .done(function(data) {
+            let noEvents = true;
+
+            if (
+              !jQuery.isEmptyObject(data.data) &&
+              data.data.events != undefined &&
+              data.data.events.length > 0
+            ) {
+              agendaEvents['results'][String(selectedDisplayGroup)] =
+                data.data;
+              // eslint-disable-next-line max-len
+              agendaEvents['results'][String(selectedDisplayGroup)]['request_date'] = params.date;
+
+              noEvents = false;
+
+              if (
+                $('#geoLatitude').val() != undefined &&
+                $('#geoLatitude').val() != '' &&
+                $('#geoLongitude').val() != undefined &&
+                $('#geoLongitude').val() != ''
+              ) {
+                // eslint-disable-next-line max-len
+                agendaEvents['results'][String(selectedDisplayGroup)]['geoLatitude'] =
+                  $('#geoLatitude').val();
+                // eslint-disable-next-line max-len
+                agendaEvents['results'][String(selectedDisplayGroup)]['geoLongitude'] =
+                  $('#geoLongitude').val();
+
+                // eslint-disable-next-line max-len
+                agendaEvents['results'][String(selectedDisplayGroup)]['events'] =
+                  filterEventsByLocation(
+                    // eslint-disable-next-line max-len
+                    agendaEvents['results'][String(selectedDisplayGroup)]['events'],
+                  );
+
+                noEvents = (data.data.events.length <= 0);
+              }
+            }
+
+            if (noEvents) {
+              agendaEvents['results'][String(selectedDisplayGroup)] = {};
+              agendaEvents['errorMessage'] = 'no_events';
+            }
+
+            $('#calendar-progress').removeClass('show');
+
+            if (done != undefined) {
+              done();
+            }
+
+            agendaCalendar._render();
+
+            getJsonRequestControl = null;
+          })
+          .fail(function(res) {
+            // Deal with the failed request
+            if (res.statusText != 'abort') {
+              agendaEvents['errorMessage'] = 'request_failed';
+            }
+
+            if (done != undefined) {
+              done();
+            }
+
+            agendaCalendar._render();
+
+            $('#calendar-progress').removeClass('show');
+          });
+      },
+      onAfterEventsLoad: function(events) {
+        // When agenda panel is ready, turn tables into datatables with paging
+        $('.agenda-panel').ready(function() {
+          $('.agenda-table-layouts').DataTable({
+            searching: false,
+            destroy: true,
+          });
+        });
+
+        if (!events) {
+          return;
+        }
+      },
+      onAfterViewLoad: function(view) {
+        if (
+          typeof this.getTitle === 'function' &&
+          $('.agenda-view-modal .modal-title .day-title').length === 0
+        ) {
+          $('.agenda-view-modal .modal-title').append(
+            `<span class="day-title"> - ${this.getTitle()}</span>`,
+          );
+        }
+      },
+      language: calendarLanguage,
+    };
+
+    options.type = calendarOptions.calendarType;
+    agendaCalendar = $('.agenda-view-modal #agendaCalendar')
+      .calendar(options);
+
+    // Add filter
+    $('.agenda-view-modal #agendaCalendar .card with-nav-tabs')
+      .prepend(templates.calendar.agendaFilter({
+        defaultLat: typeof defaultLat != 'undefined' ? defaultLat : 0,
+        defaultLong: typeof defaultLong != 'undefined' ? defaultLong : 0,
+        trans: translations.schedule.calendar.agendaFilters,
+      }));
+
+    // Set event when clicking on a tab, to refresh the view
+    $('.cal-context')
+      .off('click.agenda')
+      .on('click.agenda', 'a[data-toggle="tab"]', function(e) {
+        $('.cal-context').data().selectedTab = $(e.currentTarget).data('id');
+        agendaCalendar.view();
+      })
+      // When selecting a layout row, create a Breadcrumb Trail
+      // and select the correspondent Display Group(s) and the Campaign(s)
+      .on('click.agenda', 'tbody tr', function(e) {
+        const $self = $(e.currentTarget);
+        const alreadySelected = $self.hasClass('selected');
+
+        // Clean all selected elements
+        $('.cal-event-breadcrumb-trail').hide();
+        $('.cal-context tbody tr').removeClass('selected');
+        $('.cal-context tbody tr').removeClass('selected-linked');
+
+        // Remove previous layout preview
+        destroyMiniLayoutPreview();
+
+        // If the element was already selected return
+        // so that it can deselect everything
+        if (alreadySelected) {
+          return;
+        }
+
+        // If the click was in a layout table row create the breadcrumb trail
+        if ($self.closest('table').data('type') == 'layouts') {
+          $('.cal-event-breadcrumb-trail').show();
+
+          // Clean div content
+          $('.cal-event-breadcrumb-trail #content').html('');
+
+          // Get the template and render it on the div
+          $('.cal-event-breadcrumb-trail #content').append(
+            agendaCalendar._breadcrumbTrail(
+              $self.data('elemId'),
+              agendaEvents,
+              $self.data('eventId'),
+            ),
+          );
+
+          // Create mini layout preview
+          createMiniLayoutPreview(
+            layoutPreviewUrl.replace(':id', $self.data('elemId')),
+          );
+
+          // Initialize container for the Schedule modal handling
+          XiboInitialise('#agendaCalendar');
+        }
+
+        // Select the clicked element and the linked elements
+        agendaSelectLinkedElements(
+          $self.closest('table').data('type'),
+          $self.data('elemId'), agendaEvents,
+          $self.data('eventId'),
+        );
+      });
+  }
+
+  // Agenda View timeline
+  $('.cal-event-agenda-filter #showTimeline').off('click.agenda')
+    .on('click.agenda', function(ev) {
+      $('.cal-event-agenda-filter .cal-event-time-bar').toggle(
+        $(ev.currentTarget).is(':checked'),
+      );
+    });
 };
 
 /**

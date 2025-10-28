@@ -112,6 +112,7 @@ window.templates = {
     year: require('./src/templates/calendar/year.hbs'),
     'year-month': require('./src/templates/calendar/year-month.hbs'),
     agenda: require('./src/templates/calendar/agenda.hbs'),
+    agendaFilter: require('./src/templates/calendar/agenda-filter.hbs'),
     'agenda-layouts': require('./src/templates/calendar/agenda-layouts.hbs'),
     'agenda-displaygroups':
       require('./src/templates/calendar/agenda-display-groups.hbs'),

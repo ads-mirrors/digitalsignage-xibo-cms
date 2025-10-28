@@ -2790,32 +2790,46 @@ window.destroyDatePicker = function($element) {
   $element.parent().find('.date-open-button').off('click');
 };
 
-window.updateRangeFilter = function($element, $from, $to, callBack) {
-  let value = $element.val();
-  let from;
-  let to;
-  const isCustom = value === 'custom';
-  const isPast = value.includes('last');
+window.updateRangeFilter = function(
+  $element,
+  $from,
+  $to,
+  callBack,
+  options = {},
+) {
+  const value = $element.val();
 
-  if (value === 'agenda') {
-    value = 'day';
-  }
-
-  if (isCustom) {
+  if (value === 'custom') {
     $('.custom-date-range').removeClass('d-none');
+    $('.controls-date-range').addClass('d-none');
   } else {
     $('.custom-date-range').addClass('d-none');
+    $('.controls-date-range').removeClass('d-none');
 
-    if (!isPast) {
-      from = moment().startOf(value).format(jsDateFormat);
-      to = moment().endOf(value).format(jsDateFormat);
+    const {direction, date: customDate} = options;
+    let baseDate;
+
+    if (customDate && moment(customDate).isValid()) {
+      baseDate = moment(customDate);
+    } else if (!direction || direction === 'today') {
+      baseDate = moment();
     } else {
-      const pastValue = value.replace('last', '');
-      from = moment().startOf(pastValue)
-        .subtract(1, pastValue + 's').format(jsDateFormat);
-      to = moment().endOf(pastValue)
-        .subtract(1, pastValue + 's').format(jsDateFormat);
+      const fromDate = moment($from.val());
+      if (fromDate && fromDate.isValid()) {
+        baseDate = fromDate;
+      } else {
+        baseDate = moment();
+      }
+
+      if (direction === 'next') {
+        baseDate.add(1, value);
+      } else if (direction === 'prev') {
+        baseDate.subtract(1, value);
+      }
     }
+
+    const from = baseDate.clone().startOf(value).format(jsDateFormat);
+    const to = baseDate.clone().endOf(value).format(jsDateFormat);
 
     updateDatePicker($from, from, jsDateFormat, true);
     updateDatePicker($to, to, jsDateFormat, true);

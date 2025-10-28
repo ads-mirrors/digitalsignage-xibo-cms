@@ -1,6 +1,7 @@
 $(function() {
   // Select lists
   const dialog = 'body';
+  window.scheduleEvents = [];
 
   const $campaignSelect = $('#schedule-filter #campaignIdFilter');
   $campaignSelect.select2({
@@ -91,45 +92,38 @@ $(function() {
         };
       },
     },
-  })
-    .on('change', function(e) {
-      // Refresh the calendar view
-      setTimeout(calendar.view(), 1000);
-    })
-    .on('select2:open', function(event) {
-      setTimeout(function() {
-        $(event.target).data('select2').dropdown.$search.get(0).focus();
-      }, 10);
-    });
-
-  // Set up our show all selector control
-  $('#showAll, #eventTypeId, #recurring, #geoAware,' +
-    ' #DisplayList, #DisplayGroupList,' +
-    ' #name, #useRegexForName, #logicalOperatorName', dialog)
-    .on('change', function() {
-      setTimeout(calendar.view(), 1000);
-    });
+  }).on('select2:open', function(event) {
+    setTimeout(function() {
+      $(event.target).data('select2').dropdown.$search.get(0).focus();
+    }, 10);
+  });
 
   const table = $('#schedule-grid').DataTable({
     language: dataTablesLanguage,
     dom: dataTablesTemplate,
-    serverSide: true,
+    serverSide: false,
     stateSave: true,
     responsive: true,
     stateDuration: 0,
     stateLoadCallback: dataTableStateLoadCallback,
     stateSaveCallback: dataTableStateSaveCallback,
-    filter: false,
-    searchDelay: 3000,
     order: [],
     ajax: {
       url: scheduleSearchUrl,
       data: function(d) {
-        $.extend(
-          d,
-          $('#schedule-grid').closest('.XiboGrid')
-            .find('.FilterDiv form').serializeObject(),
-        );
+        const filterData = $('#schedule-grid').closest('.XiboGrid')
+          .find('.FilterDiv form').serializeObject();
+
+        // We are managing paging on the client
+        // So we had a large number to lenght to return all results
+        d.start = 0;
+        d.length = 999999;
+
+        $.extend(d, filterData);
+      },
+      dataSrc(json) {
+        scheduleEvents = json.data;
+        return json.data;
       },
     },
     columns: [
@@ -417,7 +411,20 @@ $(function() {
     dataTableDraw(e, settings);
     $('[data-toggle="popover"]').popover();
   });
-  table.on('processing.dt', dataTableProcessing);
+
+  table.on('processing.dt', function(e, settings, processing) {
+    if (processing) {
+      $('#calendar-progress').addClass('show');
+    } else {
+      $('#calendar-progress').removeClass('show');
+
+      // Reload calendar view
+      calendar.view();
+    }
+
+    dataTableProcessing(e, settings, processing);
+  });
+
   dataTableAddButtons(
     table,
     $('#schedule-grid_wrapper').find('.dataTables_buttons'),
@@ -425,6 +432,80 @@ $(function() {
     true,
   );
 
+  function changeCalendarView(calendarView = null) {
+    if (calendarView && calendarView != calendar.options.view) {
+      // Reload calendar with tab view
+      calendar.view(calendarView);
+    } else if (
+      !calendarView &&
+      $('#schedule-filter #range').val() != 'custom'
+    ) {
+      // Reload calendar with range value as view
+      calendar.view($('#schedule-filter #range').val());
+    }
+  }
+
+  function changeRangeVisibility(show = true) {
+    $('#schedule-filter .date-range-input').toggle(show);
+  }
+
+  // Save View tab preference
+  $('.XiboSchedule .card-header-tabs .nav-item .nav-link')
+    .on('shown.bs.tab', function(ev) {
+      const tabData = $(ev.currentTarget).data();
+      changeCalendarView(tabData.calendarView);
+      changeRangeVisibility(tabData.scheduleView === 'grid');
+
+      $.ajax({
+        type: 'post',
+        url: userPreferencesUrl,
+        cache: false,
+        dataType: 'json',
+        data: {
+          preference: [{
+            option: 'schedulePageView',
+            value: $(ev.currentTarget).attr('id'),
+          }],
+        },
+      });
+    });
+
+  // On range change, change calendar view
+  $('#schedule-filter #range').on('change', (ev) => {
+    changeCalendarView();
+  });
+
+  changeCalendarView();
+
+  // Select tab on page load
+  $.ajax({
+    type: 'GET',
+    async: false,
+    url: userPreferencesUrl + '?preference=schedulePageView',
+    dataType: 'json',
+    success: function(json) {
+      try {
+        if (json.success) {
+          // Open tab
+          $('.XiboSchedule .card-header-tabs #' + json.data.value)
+            .trigger('click');
+        }
+      } catch (e) {
+        // Do nothing
+        console.warn(e);
+      }
+    },
+  });
+
+  // Set up the navigational controls
+  $('.btn-group button[data-calendar-nav]').on('click', function(ev) {
+    const $el = $(ev.currentTarget);
+    updateRangeFilter($('#range'), $('#fromDt'), $('#toDt'), () => {
+      calendar.navigate($el.data('calendar-nav'));
+    }, {direction: $el.data('calendar-nav')});
+  });
+
+  // Refresh grid button
   $('#refreshGrid').on('click', function() {
     table.ajax.reload();
   });

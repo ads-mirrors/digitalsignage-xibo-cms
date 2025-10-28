@@ -301,6 +301,7 @@ div.dropdown-menu-form {
 }
 
 .page-header {
+    color: #627cb7;
     margin: 0;
 }
 
@@ -1019,6 +1020,44 @@ ul li.active.tab-design:hover a {
 
 .XiboFilter .form-inline select, .XiboFilterCustom .form-inline select {
     min-width: 100px;
+}
+
+.XiboSchedule .xibo-calendar-header-container,
+.XiboSchedule #grid-view .row > div,
+.XiboSchedule #calendar-view .row > div {
+    padding: 0;
+}
+
+.XiboSchedule #calendar-view #cal-slide-content {
+    background-color: #273759;
+    background-image: unset;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.XiboSchedule #calendar-view #cal-slide-content .cal-agenda-button {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.XiboSchedule #calendar-view #cal-slide-content .cal-agenda-button.is-visible {
+    opacity: 1;
+}
+
+.XiboSchedule #calendar-view #cal-day-tick {
+    display: none !important;
+}
+
+.XiboFilter .controls-date-range .controls-date-inputs {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.XiboFilter .controls-date-range .datePickerHelper {
+    display: none;
 }
 
 .bootstrap-tagsinput + [data-role="tagsInputInline"] + .input-group-addon {
