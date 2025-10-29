@@ -1555,6 +1555,9 @@ lD.deleteObject = function(
       // Check layout status
       lD.checkLayoutStatus();
 
+      // Reload layer manager
+      lD.viewer.layerManager.render();
+
       lD.common.hideLoadingScreen();
     }).catch((error) => { // Fail/error
       lD.common.hideLoadingScreen();
