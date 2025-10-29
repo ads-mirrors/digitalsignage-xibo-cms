@@ -267,7 +267,7 @@ window.XiboInitialise = function(scope, options) {
     if (anchor !== undefined && anchor !== '') {
       makePagedSelect($target, $(anchor));
     } else if (inModal) {
-      makePagedSelect($target, $(scope));
+      makePagedSelect($target, $(scope).find('.modal-body'));
     } else {
       makePagedSelect($target, $('body'));
     }
