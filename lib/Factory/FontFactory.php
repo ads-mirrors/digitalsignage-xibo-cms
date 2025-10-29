@@ -48,7 +48,8 @@ class FontFactory extends BaseFactory
             $this->getStore(),
             $this->getLog(),
             $this->getDispatcher(),
-            $this->config
+            $this->config,
+            $this
         );
     }
 
@@ -88,6 +89,7 @@ class FontFactory extends BaseFactory
         $font->fileName = preg_replace('/[^-.\w]/', '-', $fileName);
         $font->size = filesize($file);
         $font->md5 = md5_file($file);
+
         return $font;
     }
 
@@ -176,6 +178,11 @@ class FontFactory extends BaseFactory
         if ($sanitizedFilter->getString('fileName') != null) {
             $body .= ' AND `fonts`.fileName = :fileName ';
             $params['fileName'] = $sanitizedFilter->getString('fileName');
+        }
+
+        if ($sanitizedFilter->getString('md5') != null) {
+            $body .= ' AND `fonts`.md5 = :md5 ';
+            $params['md5'] = $sanitizedFilter->getString('md5');
         }
 
         // Sorting?
