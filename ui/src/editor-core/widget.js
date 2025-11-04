@@ -283,18 +283,11 @@ const Widget = function(id, data, regionId = null, layoutObject = null) {
   };
 
   /**
-   * Get widget calculated duration with the transition out value if exists
+   * Get widget calculated duration
    * @return {number} - Widget duration in seconds
    */
   this.getTotalDuration = function() {
-    let totalDuration = this.getDuration();
-
-    // Extend with transition out duration if exists
-    if (this.transitionDurationOut != undefined) {
-      totalDuration += parseFloat(this.transitionDurationOut) / 1000;
-    }
-
-    return totalDuration;
+    return this.getDuration();
   };
 
   /**
