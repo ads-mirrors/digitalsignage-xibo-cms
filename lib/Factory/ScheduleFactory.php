@@ -658,26 +658,46 @@ class ScheduleFactory extends BaseFactory
             }
         }
 
-        // Future schedules?
+       // Future schedules FROM a date?
         if ($parsedFilter->getInt('futureSchedulesFrom') !== null
             && $parsedFilter->getInt('futureSchedulesTo') === null
         ) {
             // Get schedules that end after this date, or that recur after this date
             $body .= ' AND (IFNULL(`schedule`.toDt, `schedule`.fromDt) >= :futureSchedulesFrom
-             OR `schedule`.recurrence_range >= :futureSchedulesFrom OR (IFNULL(`schedule`.recurrence_range, 0) = 0)
-              AND IFNULL(`schedule`.recurrence_type, \'\') <> \'\') ';
+              OR `schedule`.recurrence_range >= :futureSchedulesFrom OR (IFNULL(`schedule`.recurrence_range, 0) = 0)
+               AND IFNULL(`schedule`.recurrence_type, \'\') <> \'\') ';
             $params['futureSchedulesFrom'] = $parsedFilter->getInt('futureSchedulesFrom');
         }
 
+        // Future schedules BETWEEN two dates?
         if ($parsedFilter->getInt('futureSchedulesFrom') !== null
             && $parsedFilter->getInt('futureSchedulesTo') !== null
         ) {
-            // Get schedules that end after this date, or that recur after this date
-            $body .= ' AND ((schedule.fromDt < :futureSchedulesTo 
-            AND IFNULL(`schedule`.toDt, `schedule`.fromDt) >= :futureSchedulesFrom)
-             OR `schedule`.recurrence_range >= :futureSchedulesFrom OR (IFNULL(`schedule`.recurrence_range, 0) = 0
-              AND IFNULL(`schedule`.recurrence_type, \'\') <> \'\') ) ';
+            // Get schedules that overlap the range OR recur within the range
+            $body .= ' AND (
+                (
+                    schedule.fromDt < :futureSchedulesTo
+                    AND IFNULL(`schedule`.toDt, `schedule`.fromDt) >= :futureSchedulesFrom
+                )
+                OR (
+                    IFNULL(`schedule`.recurrence_type, \'\') <> \'\'
+                    AND `schedule`.fromDt < :futureSchedulesTo
+                    AND (
+                        `schedule`.recurrence_range >= :futureSchedulesFrom 
+                        OR IFNULL(`schedule`.recurrence_range, 0) = 0 
+                    )
+                )
+            ) ';
             $params['futureSchedulesFrom'] = $parsedFilter->getInt('futureSchedulesFrom');
+            $params['futureSchedulesTo'] = $parsedFilter->getInt('futureSchedulesTo');
+        }
+
+        // Future schedules UNTIL a date?
+        if ($parsedFilter->getInt('futureSchedulesFrom') === null
+            && $parsedFilter->getInt('futureSchedulesTo') !== null
+        ) {
+            // Get schedules that start before this date.
+            $body .= ' AND `schedule`.fromDt < :futureSchedulesTo ';
             $params['futureSchedulesTo'] = $parsedFilter->getInt('futureSchedulesTo');
         }
 

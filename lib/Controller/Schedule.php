@@ -471,9 +471,29 @@ class Schedule extends Base
      *      required=true
      *  ),
      *  @SWG\Parameter(
+     *      name="singlePointInTime",
+     *      in="query",
+     *      required=false,
+     *      type="integer",
+     *  ),
+     *  @SWG\Parameter(
      *      name="date",
      *      in="query",
-     *      required=true,
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="startDate",
+     *      in="query",
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="endDate",
+     *      in="query",
+     *      required=false,
      *      type="string",
      *      description="Date in Y-m-d H:i:s"
      *  ),
@@ -495,15 +515,24 @@ class Schedule extends Base
         // Setting for whether we show Layouts with out permissions
         $showLayoutName = ($this->getConfig()->getSetting('SCHEDULE_SHOW_LAYOUT_NAME') == 1);
 
-        $date = $sanitizedParams->getDate('date');
+        $singlePointInTime = $sanitizedParams->getInt('singlePointInTime');
+        if ($singlePointInTime == 1) {
+            $startDate = $sanitizedParams->getDate('date');
+            $endDate = $sanitizedParams->getDate('date');
+        } else {
+            $startDate = $sanitizedParams->getDate('startDate');
+            $endDate = $sanitizedParams->getDate('endDate');
+        }
 
         // Reset the seconds
-        $date->second(0);
+        $startDate->second(0);
+        $endDate->second(0);
 
         $this->getLog()->debug(
             sprintf(
-                'Generating eventList for DisplayGroupId ' . $id . ' on date '
-                . $date->format(DateFormatHelper::getSystemFormat())
+                'Generating eventList for DisplayGroupId ' . $id . ' from date '
+                . $startDate->format(DateFormatHelper::getSystemFormat()) . ' to '
+                . $endDate->format(DateFormatHelper::getSystemFormat())
             )
         );
 
@@ -529,7 +558,12 @@ class Schedule extends Base
         }
 
         // Get list of events
-        $scheduleForXmds = $this->scheduleFactory->getForXmds(($display === null) ? null : $display->displayId, $date, $date, $options);
+        $scheduleForXmds = $this->scheduleFactory->getForXmds(
+            ($display === null) ? null : $display->displayId,
+            $startDate,
+            $endDate,
+            $options
+        );
 
         $this->getLog()->debug(count($scheduleForXmds) . ' events returned for displaygroup and date');
 
@@ -551,7 +585,7 @@ class Schedule extends Base
 
             // Get scheduled events based on recurrence
             try {
-                $scheduleEvents = $schedule->getEvents($date, $date);
+                $scheduleEvents = $schedule->getEvents($startDate, $endDate);
             } catch (GeneralException $e) {
                 $this->getLog()->error('Unable to getEvents for ' . $schedule->eventId);
                 continue;

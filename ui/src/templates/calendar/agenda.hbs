@@ -1,7 +1,6 @@
 <div class="container-fluid">
     <!-- Content panel with tabs -->
     <div class="card with-nav-tabs bg-white agenda-panel">
-    
         <!-- Tab Panel -->
         <% if (typeof agenda.displayGroupList != 'undefined' && agenda.displayGroupList.length > 1) { %>
             <div class="card-heading">
@@ -37,8 +36,6 @@
             <div class="text-danger text-center">
             <% if (agenda.errorMessage == 'display_not_selected') { %>
             <p>{{trans.displayNotSelected}}</p>
-            <% } else if (agenda.errorMessage == 'all_displays_selected') { %>
-            <p>{{trans.showAllOptionsDNW}}</p>
             <% } else if (agenda.errorMessage == 'no_events') { %>
             <p>{{trans.noEventsForTheChosen}}</p>
             <% } else if (agenda.errorMessage == 'request_failed') { %>
@@ -49,7 +46,7 @@
             <!-- Request successful - Show Data -->
                 
             <!-- Breadcrumb trail -->
-            <div class="cal-event-breadcrumb-trail col-12">
+            <div class="cal-event-breadcrumb-trail col-12 mt-2">
                 <div id="content"></div>
             </div>     
             
@@ -64,7 +61,7 @@
                         <div id="tab_<%= displayGroup['id'] %>" class="tab-pane <%= isActive %> container-fluid">
                             <div class="row">
                                 <% if(typeof resultItem.events != 'undefined') { %>
-                                    <div class="col-lg-9 agenda-col">
+                                    <div class="col-lg-9 agenda-col agenda-col-lt">
                                         <%= cal._layouts(resultItem.events, resultItem.layouts, 1) %>
                                         <%= cal._layouts(resultItem.events, resultItem.layouts, 3) %>
                                         <%= cal._layouts(resultItem.events, resultItem.layouts, 4) %>
@@ -73,7 +70,7 @@
                                         <%= cal._layouts(resultItem.events, resultItem.layouts, 8) %>
                                         <%= cal._layouts(resultItem.events, resultItem.layouts, 9) %>
                                     </div>
-                                    <div class="col-lg-3 agenda-col">
+                                    <div class="col-lg-3 agenda-col agenda-col-dg">
                                         <div class="row">
                                             <div class="col-6 col-lg-12 agenda-col">
                                                 <%= cal._displaygroups(resultItem.events, resultItem.displayGroups) %>
