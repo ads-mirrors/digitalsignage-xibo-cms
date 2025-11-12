@@ -538,7 +538,7 @@ class Schedule implements \JsonSerializable
      * @return bool
      * @throws GeneralException
      */
-    private function inScheduleLookAhead()
+    private function inScheduleLookAhead(): bool
     {
         if ($this->isAlwaysDayPart()) {
             return true;
@@ -551,6 +551,9 @@ class Schedule implements \JsonSerializable
 
         // Dial current date back to the start of the day
         $currentDate->startOfDay();
+
+        // Is the event updated to a past date?
+        $isEventUpdatedToPastDate = ($this->toDt <= $this->getOriginalValue('toDt'));
 
         // Test dates
         if ($this->recurrenceType != '') {
@@ -568,6 +571,12 @@ class Schedule implements \JsonSerializable
             // only test the from date.
             $this->getLog()->debug('Checking look ahead based from date ' . $currentDate->toRssString());
             return ($this->fromDt >= $currentDate->format('U') && $this->fromDt <= $rfLookAhead->format('U'));
+        } else if ($isEventUpdatedToPastDate) {
+            // Check if the event was updated to a past date
+            // We only need to check the toDt
+            $this->getLog()->debug('Checking look ahead based based on previous event details');
+
+            return ($this->getOriginalValue('toDt') >= $currentDate->format('U'));
         } else {
             // Compare the event dates
             $this->getLog()->debug(
@@ -939,6 +948,7 @@ class Schedule implements \JsonSerializable
         // Notify
         if ($options['notify']) {
             // Only if the schedule effects the immediate future - i.e. within the RF Look Ahead
+            // Or if the scheduled event was updated to a past date
             if ($this->inScheduleLookAhead()) {
                 $this->getLog()->debug(
                     'Schedule changing is within the schedule look ahead, will notify '

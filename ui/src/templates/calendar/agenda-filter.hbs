@@ -1,0 +1,44 @@
+<div class="col-sm-12 cal-event-agenda-filter">
+    <div class="d-flex justify-content-between">
+        <!-- Timeline Checkbox -->
+        <div class="d-flex align-items-center">
+            <div class="form-check">
+                <input title="{{ trans.showTimeLineLabel }}" class="form-check-input" type="checkbox" id="showTimeline" name="showTimeline">
+                <label class="form-check-label" title="{{ trans.showTimeLineLabel }}" for="showTimeline" accesskey="">{{ trans.showTimeLineLabel }}</label>
+            </div>
+        </div>
+
+        <!-- Geo location -->
+        <form class="form-inline cal-event-location">
+            <button id="toggleMap" type="button" class="btn btn-primary pull-right" title="{{ trans.geoMap }}"><i
+                    class="fa fa-map"></i></button>
+            <button id="getLocation" type="button" class="btn btn-white pull-right" title="{{ trans.geoGetBrowserLocation }}"><i class="fa fa-map-marker"></i>
+            </button>
+            <button id="clearLocation" type="button" class="btn btn-white pull-right" title="{{ trans.geoClearCoord }}"><i class="fa fa-times"></i>
+            </button>
+            <div class="form-group pull-right">
+                <input type="email" class="form-control" id="geoLongitude" placeholder="{{ trans.geoLongitude }}">
+            </div>
+            <div class="form-group pull-right">
+                <input type="text" class="form-control" id="geoLatitude" placeholder="{{ trans.geoLatitude }}">
+            </div>
+        </form>
+    </div>
+
+    <!-- Timeline -->
+    <div class="cal-event-time-bar" style="display: none;">
+        <div class="btn slider-step-btn time-picker-step-btn" data-step="-1">
+            <span class="fa fa-step-backward"></span>
+        </div>
+        <input id="timePicker" type="text" data-slider-id='timePickerSlider' data-slider-min="0" data-slider-max="1439"
+            data-slider-step="1" data-slider-value="0" data-slider-handle="square" />
+        <div class="btn slider-step-btn time-picker-step-btn" data-step="1">
+            <span class="fa fa-step-forward"></span>
+        </div>
+    </div>
+
+    <!-- Geo location map -->
+    <div class="cal-event-location-map" data-default-lat="{{ defaultLat }}" data-default-long="{{ defaultLong }}">
+        <div id="geoFilterAgendaMap" style="height: 400px; width: 100%" class="d-none"></div>
+    </div>
+</div>

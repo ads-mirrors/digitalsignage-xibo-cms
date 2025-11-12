@@ -169,11 +169,13 @@ class Schedule extends Base
 
     /**
      * Generates the calendar that we draw events on
-     *
+     * @deprecated - Deprecated API: This endpoint will be removed in v5.0
      * @SWG\Get(
      *  path="/schedule/data/events",
      *  operationId="scheduleCalendarData",
+     *  description="⚠️ This endpoint is deprecated and will be removed in v5.0.",
      *  tags={"schedule"},
+     *  deprecated=true,
      *  @SWG\Parameter(
      *      name="displayGroupIds",
      *      description="The DisplayGroupIds to return the schedule for. [-1] for All.",
@@ -215,7 +217,14 @@ class Schedule extends Base
      */
     public function eventData(Request $request, Response $response)
     {
-        $response = $response->withHeader('Content-Type', 'application/json');
+        $response = $response
+            ->withHeader(
+            'Warning',
+            '299 - "Deprecated API: /schedule/data/events will be removed in v5.0"'
+        );
+
+        $this->getLog()->error('Deprecated API called: /schedule/data/events');
+
         $this->setNoOutput();
         $sanitizedParams = $this->getSanitizer($request->getParams());
 
@@ -462,9 +471,29 @@ class Schedule extends Base
      *      required=true
      *  ),
      *  @SWG\Parameter(
+     *      name="singlePointInTime",
+     *      in="query",
+     *      required=false,
+     *      type="integer",
+     *  ),
+     *  @SWG\Parameter(
      *      name="date",
      *      in="query",
-     *      required=true,
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="startDate",
+     *      in="query",
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="endDate",
+     *      in="query",
+     *      required=false,
      *      type="string",
      *      description="Date in Y-m-d H:i:s"
      *  ),
@@ -486,15 +515,24 @@ class Schedule extends Base
         // Setting for whether we show Layouts with out permissions
         $showLayoutName = ($this->getConfig()->getSetting('SCHEDULE_SHOW_LAYOUT_NAME') == 1);
 
-        $date = $sanitizedParams->getDate('date');
+        $singlePointInTime = $sanitizedParams->getInt('singlePointInTime');
+        if ($singlePointInTime == 1) {
+            $startDate = $sanitizedParams->getDate('date');
+            $endDate = $sanitizedParams->getDate('date');
+        } else {
+            $startDate = $sanitizedParams->getDate('startDate');
+            $endDate = $sanitizedParams->getDate('endDate');
+        }
 
         // Reset the seconds
-        $date->second(0);
+        $startDate->second(0);
+        $endDate->second(0);
 
         $this->getLog()->debug(
             sprintf(
-                'Generating eventList for DisplayGroupId ' . $id . ' on date '
-                . $date->format(DateFormatHelper::getSystemFormat())
+                'Generating eventList for DisplayGroupId ' . $id . ' from date '
+                . $startDate->format(DateFormatHelper::getSystemFormat()) . ' to '
+                . $endDate->format(DateFormatHelper::getSystemFormat())
             )
         );
 
@@ -520,7 +558,12 @@ class Schedule extends Base
         }
 
         // Get list of events
-        $scheduleForXmds = $this->scheduleFactory->getForXmds(($display === null) ? null : $display->displayId, $date, $date, $options);
+        $scheduleForXmds = $this->scheduleFactory->getForXmds(
+            ($display === null) ? null : $display->displayId,
+            $startDate,
+            $endDate,
+            $options
+        );
 
         $this->getLog()->debug(count($scheduleForXmds) . ' events returned for displaygroup and date');
 
@@ -542,7 +585,7 @@ class Schedule extends Base
 
             // Get scheduled events based on recurrence
             try {
-                $scheduleEvents = $schedule->getEvents($date, $date);
+                $scheduleEvents = $schedule->getEvents($startDate, $endDate);
             } catch (GeneralException $e) {
                 $this->getLog()->error('Unable to getEvents for ' . $schedule->eventId);
                 continue;

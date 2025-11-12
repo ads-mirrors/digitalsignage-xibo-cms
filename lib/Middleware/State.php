@@ -189,7 +189,9 @@ class State implements Middleware
         Carbon::setLocale(Translate::GetLocale(2));
 
         // Default timezone
-        date_default_timezone_set($container->get('configService')->getSetting('defaultTimezone'));
+        $defaultTimezone = $container->get('configService')->getSetting('defaultTimezone') ?? 'UTC';
+
+        date_default_timezone_set($defaultTimezone);
 
         $container->set('session', function (ContainerInterface $container) use ($app) {
             if ($container->get('name') == 'web' || $container->get('name') == 'auth') {
@@ -266,6 +268,10 @@ class State implements Middleware
 
             $container->get('logService')->setLevel($level);
         }
+
+
+        // Update logger containers to use the CMS default timezone
+        $container->get('logger')->setTimezone(new \DateTimeZone($defaultTimezone));
 
         // Configure any extra log handlers
         // we do these last so that they can provide their own log levels independent of the system settings

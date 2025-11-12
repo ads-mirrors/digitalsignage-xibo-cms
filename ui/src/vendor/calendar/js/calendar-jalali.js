@@ -1502,7 +1502,7 @@ if(!String.prototype.formatNum) {
 				downbox.hide();
 			})
 			.on('click', function(event) {
-				if($('.events-list', this).length == 0) return;
+				if($('.events-list', this).length == 0 || $(event.target).is('.cal-month-day-number')) return;
 				if($(this).children('[data-cal-date]').text() == self.activecell) return;
 				showEventsList(event, downbox, slider, self);
 			})
@@ -1582,6 +1582,7 @@ if(!String.prototype.formatNum) {
 				$('div.cal-cell1').removeClass('day-highlight dh-' + $(this).data('event-class'));
 			});
 			self._update_modal();
+			self.context.trigger('calendar.eventListReady', self.options.day);
 		}, 400);
 	}
 
