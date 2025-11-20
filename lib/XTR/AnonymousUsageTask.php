@@ -100,6 +100,9 @@ class AnonymousUsageTask implements TaskInterface
                 'name' => '\\Xibo\\Connector\\XiboDashboardConnector'
             ]) ?? 0;
 
+        // Most recent date any user log in happened
+        $data['dateSinceLastUserLogin'] = $this->getDateSinceLastUserLogin();
+
         // Displays
         $data = array_merge($data, $this->displayStats());
         $data['countOfDisplays'] = $this->runQuery(
@@ -301,5 +304,23 @@ class AnonymousUsageTask implements TaskInterface
             $this->getLogger()->debug('runQuery: error returning specific stat, e: ' . $PDOException->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Get the most recent user login timestamp converted to UTC
+     * @return string|null
+     */
+    private function getDateSinceLastUserLogin(): string|null
+    {
+        $cmsTimezone = $this->getConfig()->getSetting('defaultTimezone');
+        $latestUserLoginDate = $this->runQuery(
+            'SELECT MAX(`lastAccessed`) AS lastAccessed FROM `user`',
+            [],
+            'lastAccessed'
+        );
+
+        return $latestUserLoginDate
+            ? Carbon::parse($latestUserLoginDate, $cmsTimezone)->setTimezone('UTC')->timestamp
+            : null;
     }
 }
