@@ -36,8 +36,10 @@ use Xibo\Factory\UserFactory;
 use Xibo\Factory\UserGroupFactory;
 use Xibo\Factory\UserTypeFactory;
 use Xibo\Helper\ByteFormatter;
+use Xibo\Helper\DateFormatHelper;
 use Xibo\Helper\QuickChartQRProvider;
 use Xibo\Helper\Random;
+use Xibo\Helper\Translate;
 use Xibo\Service\MediaService;
 use Xibo\Support\Exception\AccessDeniedException;
 use Xibo\Support\Exception\ConfigurationException;
@@ -205,18 +207,38 @@ class User extends Base
      * @param Request $request
      * @param Response $response
      * @return \Psr\Http\Message\ResponseInterface|Response
-     * @throws GeneralException
-     * @throws \Xibo\Support\Exception\ControllerNotImplemented
+     * @throws \Xibo\Support\Exception\GeneralException
      */
     public function myDetails(Request $request, Response $response)
     {
-        // Return
-        $this->getState()->hydrate([
-            'httpStatus' => 200,
-            'data' => $this->getUser()
-        ]);
+        $settings = $this->getConfig()->getSettings();
 
-        return $this->render($request, $response);
+        // Date format
+        $settings['DATE_FORMAT_JS'] = DateFormatHelper::convertPhpToMomentFormat($settings['DATE_FORMAT']);
+        $settings['DATE_FORMAT_JALALI_JS'] = DateFormatHelper::convertMomentToJalaliFormat($settings['DATE_FORMAT_JS']);
+        $settings['TIME_FORMAT'] = DateFormatHelper::extractTimeFormat($settings['DATE_FORMAT']);
+        $settings['TIME_FORMAT_JS'] = DateFormatHelper::convertPhpToMomentFormat($settings['TIME_FORMAT']);
+        $settings['DATE_ONLY_FORMAT'] = DateFormatHelper::extractDateOnlyFormat($settings['DATE_FORMAT']);
+        $settings['DATE_ONLY_FORMAT_JS'] = DateFormatHelper::convertPhpToMomentFormat($settings['DATE_ONLY_FORMAT']);
+        $settings['DATE_ONLY_FORMAT_JALALI_JS'] = DateFormatHelper::convertMomentToJalaliFormat(
+            $settings['DATE_ONLY_FORMAT_JS']
+        );
+        $settings['systemDateFormat'] = DateFormatHelper::convertPhpToMomentFormat(DateFormatHelper::getSystemFormat());
+        $settings['systemTimeFormat'] = DateFormatHelper::convertPhpToMomentFormat(
+            DateFormatHelper::extractTimeFormat(DateFormatHelper::getSystemFormat())
+        );
+
+        $settings['translate'] = [
+            'locale' => Translate::GetLocale(),
+            'jsLocale' => Translate::getRequestedJsLocale(),
+            'jsShortLocale' => Translate::getRequestedJsLocale(['short' => true])
+        ];
+        $settings['accountId'] = defined('ACCOUNT_ID') ? constant('ACCOUNT_ID') : null;
+
+        // TODO: output some settings
+        return $response->withJson(array_merge($this->getUser()->toArray(), [
+            'settings' => $settings,
+        ]));
     }
 
     /**

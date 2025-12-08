@@ -441,13 +441,20 @@ class Login extends Base
     {
         $state = $this->getState();
 
-        if ($request->isXhr()) {
+        if ($request->isXhr() || $this->isApi($request)) {
             $state->template = 'about-text';
         } else {
             $state->template = 'about-page';
         }
 
-        $state->setData(['version' => Environment::$WEBSITE_VERSION_NAME, 'sourceUrl' => $this->getConfig()->getThemeConfig('cms_source_url')]);
+        // TODO: output source URL from settings.
+        $state->setData([
+            'version' => Environment::$WEBSITE_VERSION_NAME,
+            'revision' => Environment::getGitCommit(),
+            'playerVersion' => Environment::$PLAYER_SUPPORT,
+            'isDevMode' => Environment::isDevMode(),
+            'sourceUrl' => 'https://github.com/xibosignage/xibo-cms',
+        ]);
 
         return $this->render($request, $response);
     }

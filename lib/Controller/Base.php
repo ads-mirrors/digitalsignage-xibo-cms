@@ -191,7 +191,7 @@ class Base
      * @param Request $request
      * @return bool
      */
-    protected function isApi(Request $request)
+    protected function isApi(Request $request): bool
     {
         return ($request->getAttribute('_entryPoint') != 'web');
     }
@@ -208,14 +208,6 @@ class Base
     {
         $routeParser = RouteContext::fromRequest($request)->getRouteParser();
         return $routeParser->urlFor($route, $data, $params);
-    }
-
-    /**
-     * Set to not output a full page automatically
-     */
-    public function setNotAutomaticFullPage()
-    {
-        $this->fullPage = false;
     }
 
     /**
