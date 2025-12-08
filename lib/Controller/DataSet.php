@@ -634,8 +634,6 @@ class DataSet extends Base
         $dataSet->description = $sanitizedParams->getString('description');
         $dataSet->code = $sanitizedParams->getString('code');
         $dataSet->isRemote = $sanitizedParams->getCheckbox('isRemote');
-        $dataSet->isRealTime = $sanitizedParams->getCheckbox('isRealTime');
-        $dataSet->dataConnectorSource = $sanitizedParams->getString('dataConnectorSource');
         $dataSet->userId = $this->getUser()->userId;
 
         // Folders
@@ -687,6 +685,11 @@ class DataSet extends Base
         // only when we are not routing through the API
         if (!$this->isApi($request)) {
             $dataSet->assignColumn($dataSetColumn);
+        }
+
+        if ($this->getUser()->featureEnabled('dataset.realtime')) {
+            $dataSet->isRealTime = $sanitizedParams->getCheckbox('isRealTime');
+            $dataSet->dataConnectorSource = $sanitizedParams->getString('dataConnectorSource');
         }
 
         // Save
@@ -985,8 +988,6 @@ class DataSet extends Base
         $dataSet->description = $sanitizedParams->getString('description');
         $dataSet->code = $sanitizedParams->getString('code');
         $dataSet->isRemote = $sanitizedParams->getCheckbox('isRemote');
-        $dataSet->isRealTime = $sanitizedParams->getCheckbox('isRealTime');
-        $dataSet->dataConnectorSource = $sanitizedParams->getString('dataConnectorSource');
         $dataSet->folderId = $sanitizedParams->getInt('folderId', ['default' => $dataSet->folderId]);
 
         if ($dataSet->hasPropertyChanged('folderId')) {
@@ -995,6 +996,11 @@ class DataSet extends Base
             }
             $folder = $this->folderFactory->getById($dataSet->folderId);
             $dataSet->permissionsFolderId = ($folder->getPermissionFolderId() == null) ? $folder->id : $folder->getPermissionFolderId();
+        }
+
+        if ($this->getUser()->featureEnabled('dataset.realtime')) {
+            $dataSet->isRealTime = $sanitizedParams->getCheckbox('isRealTime');
+            $dataSet->dataConnectorSource = $sanitizedParams->getString('dataConnectorSource');
         }
 
         if ($dataSet->isRemote === 1) {
@@ -1890,7 +1896,7 @@ class DataSet extends Base
             'dataSet' => $dataSet,
             'script' => $script,
             ]);
-    
+
             return $this->render($request, $response);
     }
 
