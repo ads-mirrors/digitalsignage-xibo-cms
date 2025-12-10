@@ -23,9 +23,10 @@ import path from 'node:path';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react-swc';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
+  base: '/prototype/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -34,17 +35,24 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 5173,
-    open: false,
+    open: '/prototype/',
     proxy: {
       '/json': {
         target: 'http://localhost',
         changeOrigin: true,
+        secure: false,
       },
       '/api': {
         target: 'http://localhost',
         changeOrigin: true,
+        secure: false,
       },
       '/authorize': {
+        target: 'http://localhost',
+        changeOrigin: true,
+        secure: false,
+      },
+      '^/(?!prototype|api|authorize|swagger.json).*': {
         target: 'http://localhost',
         changeOrigin: true,
         secure: false,

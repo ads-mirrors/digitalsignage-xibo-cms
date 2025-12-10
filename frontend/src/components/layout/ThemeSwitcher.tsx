@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-export default function LanguageSwitcher() {
+export default function ThemeSwitcher() {
   const { t } = useTranslation();
 
   return (

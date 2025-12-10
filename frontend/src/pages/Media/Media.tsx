@@ -72,7 +72,6 @@ export default function Media() {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-xl font-semibold">{t('Media')}</h2>
       <div>
         {error && <div className="text-red-600 mb-4">{error}</div>}
         <TableWithFilter data={data} columns={columns} />

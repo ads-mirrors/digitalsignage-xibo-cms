@@ -1,47 +1,38 @@
 import { createBrowserRouter, redirect } from 'react-router-dom';
 
-import { requireAuthLoader, redirectIfAuthedLoader } from './loaders';
+import { requireAuthLoader } from './loaders';
 
 import RootLayout from '@/app/RootLayout';
 import WithPageWrapper from '@/app/WithPageWrapper';
+import { APP_ROUTES } from '@/config/appRoutes';
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <RootLayout />,
+      children: [
+        // Protected
+        {
+          loader: requireAuthLoader,
+          element: <WithPageWrapper />,
+          children: [
+            // For now it redirect to media page
+            { index: true, loader: () => redirect('/media') },
+            ...APP_ROUTES.map((route) => ({
+              path: route.path,
+              lazy: route.lazy,
+            })),
+          ],
+        },
+      ],
+    },
+    {
+      path: '*',
+      lazy: () => import('@/pages/NotFound/NotFound').then((m) => ({ Component: m.default })),
+    },
+  ],
   {
-    path: '/',
-    element: <RootLayout />,
-    children: [
-      // Protected
-      {
-        loader: requireAuthLoader,
-        element: <WithPageWrapper />,
-        children: [
-          { index: true, loader: () => redirect('/dashboard') },
-          {
-            path: 'dashboard',
-            lazy: () =>
-              import('@/pages/Dashboard/Dashboard').then((m) => ({ Component: m.default })),
-          },
-          {
-            path: 'media',
-            lazy: () => import('@/pages/Media/Media').then((m) => ({ Component: m.default })),
-          },
-          {
-            path: 'settings',
-            lazy: () => import('@/pages/Settings/Settings').then((m) => ({ Component: m.default })),
-          },
-        ],
-      },
-    ],
+    basename: '/prototype',
   },
-  // Public
-  {
-    path: 'login',
-    loader: redirectIfAuthedLoader,
-    lazy: () => import('@/pages/Auth/Login').then((m) => ({ Component: m.default })),
-  },
-
-  {
-    path: '*',
-    lazy: () => import('@/pages/NotFound/NotFound').then((m) => ({ Component: m.default })),
-  },
-]);
+);
