@@ -1081,6 +1081,10 @@ class DataSet extends Base
             throw new AccessDeniedException();
         }
 
+        if (!$this->getUser()->featureEnabled('dataset.data')) {
+            throw new AccessDeniedException(__('Feature not enabled'));
+        }
+
         if ($dataSet->isRealTime === 1) {
             // Set the script.
             $dataSet->saveScript($sanitizedParams->getParam('dataConnectorScript'));
@@ -1874,6 +1878,10 @@ class DataSet extends Base
 
         if (!$this->getUser()->checkEditable($dataSet)) {
             throw new AccessDeniedException();
+        }
+
+        if (!$this->getUser()->featureEnabled('dataset.data')) {
+            throw new AccessDeniedException(__('Feature not enabled'));
         }
 
         $dataSet->load();
