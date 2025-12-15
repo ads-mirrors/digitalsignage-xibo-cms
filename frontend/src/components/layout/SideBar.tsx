@@ -49,7 +49,7 @@ export default function SidebarMenu({ isCollapsed, toggleSidebar }: SidebarMenuP
           );
         } else {
           return (
-            <a href={route.externalURL} className={inactiveClasses}>
+            <a key={route.externalURL} href={route.externalURL} className={inactiveClasses}>
               <route.icon className="pr-2" size={30} />
               {label}
             </a>
