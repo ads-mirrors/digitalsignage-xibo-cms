@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2025 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -48,11 +48,12 @@ use Xibo\Factory\UserGroupFactory;
 use Xibo\Factory\WidgetDataFactory;
 use Xibo\Factory\WidgetFactory;
 use Xibo\Helper\DateFormatHelper;
-use Xibo\Helper\Environment;
+use Xibo\Helper\HttpsDetect;
 use Xibo\Helper\LayoutUploadHandler;
 use Xibo\Helper\Profiler;
 use Xibo\Helper\SendFile;
 use Xibo\Helper\Status;
+use Xibo\Service\JwtServiceInterface;
 use Xibo\Service\MediaService;
 use Xibo\Service\MediaServiceInterface;
 use Xibo\Support\Exception\AccessDeniedException;
@@ -60,7 +61,6 @@ use Xibo\Support\Exception\GeneralException;
 use Xibo\Support\Exception\InvalidArgumentException;
 use Xibo\Support\Exception\NotFoundException;
 use Xibo\Widget\Render\WidgetDownloader;
-use Xibo\Widget\SubPlaylistItem;
 
 /**
  * Class Layout
@@ -157,6 +157,7 @@ class Layout extends Base
         WidgetFactory $widgetFactory,
         private readonly WidgetDataFactory $widgetDataFactory,
         PlaylistFactory $playlistFactory,
+        private readonly JwtServiceInterface $jwtService,
     ) {
         $this->session = $session;
         $this->userFactory = $userFactory;
@@ -224,8 +225,9 @@ class Layout extends Base
         $layout = $this->layoutFactory->loadById($id);
         $sanitizedParams = $this->getSanitizer($request->getParams());
 
-        if (!$this->getUser()->checkEditable($layout))
+        if (!$this->getUser()->checkEditable($layout)) {
             throw new AccessDeniedException();
+        }
 
         // Get the parent layout if it's editable
         if ($layout->isEditable()) {
@@ -240,10 +242,15 @@ class Layout extends Base
             } else {
                 $resolution = $this->resolutionFactory->getByDimensions($layout->width, $layout->height);
             }
-        } catch (NotFoundException $notFoundException) {
-            $this->getLog()->info('Layout Editor with an unknown resolution, we will create it with name: ' . $layout->width . ' x ' . $layout->height);
+        } catch (NotFoundException) {
+            $this->getLog()->info('Layout Editor with an unknown resolution, we will create it with name: '
+                . $layout->width . ' x ' . $layout->height);
 
-            $resolution = $this->resolutionFactory->create($layout->width . ' x ' . $layout->height, (int)$layout->width, (int)$layout->height);
+            $resolution = $this->resolutionFactory->create(
+                $layout->width . ' x ' . $layout->height,
+                (int)$layout->width,
+                (int)$layout->height
+            );
             $resolution->userId = $this->userFactory->getSystemUser()->userId;
             $resolution->save();
         }
@@ -268,6 +275,13 @@ class Layout extends Base
             ]),
             'modules' => $moduleFactory->getAssignableModules(),
             'timeZones' => $timeZones,
+            'previewJwt' => $this->jwtService->generateJwt(
+                'Preview',
+                'layout',
+                $layout->layoutId,
+                '/preview/layout/preview/' . $layout->layoutId,
+                3600,
+            )->toString(),
         ];
 
         // Call the render the template
@@ -1565,6 +1579,7 @@ class Layout extends Base
         $parsedQueryParams = $this->getSanitizer($request->getQueryParams());
         // Should we parse the description into markdown
         $showDescriptionId = $parsedQueryParams->getInt('showDescriptionId');
+        $baseUrl = (new HttpsDetect())->getBaseUrl($request);
 
         // We might need to embed some extra content into the response if the "Show Description"
         // is set to media listing
@@ -1843,12 +1858,20 @@ class Layout extends Base
 
             // Preview
             if ($this->getUser()->featureEnabled('layout.view')) {
+                $jwt = $this->jwtService->generateJwt(
+                    'Preview',
+                    'layout',
+                    $layout->layoutId,
+                    '/preview/layout/preview/' . $layout->layoutId,
+                    3600,
+                )->toString();
+
                 $layout->buttons[] = array(
                     'id' => 'layout_button_preview',
                     'external' => true,
                     'url' => '#',
                     'onclick' => 'createMiniLayoutPreview',
-                    'onclickParam' => $this->urlFor($request, 'layout.preview', ['id' => $layout->layoutId]),
+                    'onclickParam' => $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt,
                     'text' => __('Preview Layout')
                 );
 
@@ -1859,7 +1882,8 @@ class Layout extends Base
                         'external' => true,
                         'url' => '#',
                         'onclick' => 'createMiniLayoutPreview',
-                        'onclickParam' => $this->urlFor($request, 'layout.preview', ['id' => $layout->layoutId]) . '?isPreviewDraft=true',
+                        'onclickParam' => $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt
+                            . '&isPreviewDraft=true',
                         'text' => __('Preview Draft Layout')
                     );
                 }
@@ -2754,7 +2778,7 @@ class Layout extends Base
 
         $layout = $this->layoutFactory->getById($id);
 
-        if (!$this->getUser()->checkViewable($layout)) {
+        if (!$this->getUser()->checkViewable($layout) && $request->getAttribute('authedViaToken') !== true) {
             throw new AccessDeniedException();
         }
 

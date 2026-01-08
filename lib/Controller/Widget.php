@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2025 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -40,6 +40,7 @@ use Xibo\Factory\WidgetAudioFactory;
 use Xibo\Factory\WidgetDataFactory;
 use Xibo\Factory\WidgetFactory;
 use Xibo\Helper\DateFormatHelper;
+use Xibo\Middleware\TokenAuthMiddleware;
 use Xibo\Support\Exception\AccessDeniedException;
 use Xibo\Support\Exception\ConfigurationException;
 use Xibo\Support\Exception\GeneralException;
@@ -1111,16 +1112,22 @@ class Widget extends Base
      */
     public function getData(Request $request, Response $response, $regionId, $id)
     {
+        /** @var \Lcobucci\JWT\Token $token */
+        $token = $request->getAttribute('authedToken');
+        if (empty($token)) {
+            throw new AccessDeniedException();
+        }
+
+        // Get the region
         $region = $this->regionFactory->getById($regionId);
-        if (!$this->getUser()->checkViewable($region)) {
-            throw new AccessDeniedException(__('This Region is not shared with you'));
+
+        // Check the token allows access to this layout.
+        if (!$token->isPermittedFor('layout') || !$token->isIdentifiedBy($region->layoutId)) {
+            throw new AccessDeniedException();
         }
 
+        // Get the other objects
         $widget = $this->widgetFactory->loadByWidgetId($id);
-        if (!$this->getUser()->checkViewable($widget)) {
-            throw new AccessDeniedException(__('This Widget is not shared with you'));
-        }
-
         $module = $this->moduleFactory->getByType($widget->type);
 
         // This is always a preview
@@ -1330,16 +1337,22 @@ class Widget extends Base
     {
         $this->setNoOutput();
 
+        /** @var \Lcobucci\JWT\Token $token */
+        $token = $request->getAttribute('authedToken');
+        if (empty($token)) {
+            throw new AccessDeniedException();
+        }
+
+        // Get the region
         $region = $this->regionFactory->getById($regionId);
-        if (!$this->getUser()->checkViewable($region)) {
-            throw new AccessDeniedException(__('This Region is not shared with you'));
+
+        // Check the token allows access to this layout.
+        if (!$token->isPermittedFor('layout') || !$token->isIdentifiedBy($region->layoutId)) {
+            throw new AccessDeniedException();
         }
 
+        // Get the other objects
         $widget = $this->widgetFactory->loadByWidgetId($id);
-        if (!$this->getUser()->checkViewable($widget)) {
-            throw new AccessDeniedException(__('This Widget is not shared with you'));
-        }
-
         $module = $this->moduleFactory->getByType($widget->type);
 
         // 3 options
@@ -1392,11 +1405,24 @@ class Widget extends Base
             );
 
             if (!empty($resource)) {
+                $encryptionKey = $this->getConfig()->getApiKeyDetails()['encryptionKey'];
                 $resource = $renderer->decorateForPreview(
                     $region,
                     $resource,
-                    function (string $route, array $data, array $params = []) use ($request) {
-                        return $this->urlFor($request, $route, $data, $params);
+                    function (string $route, array $data, array $params = []) use ($request, $encryptionKey, $token) {
+                        if ($route === 'layout.preview.bundle'
+                            || $route === 'module.asset.download'
+                            || $route === 'module.getData'
+                        ) {
+                            return $this->urlFor($request, $route, $data, $params);
+                        } else {
+                            return TokenAuthMiddleware::sign(
+                                $request,
+                                $this->urlFor($request, $route, $data, $params),
+                                time() + 3600,
+                                $encryptionKey,
+                            );
+                        }
                     },
                     $request,
                 );

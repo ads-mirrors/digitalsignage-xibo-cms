@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2023 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -32,6 +32,9 @@ use Xibo\Factory\ModuleFactory;
 use Xibo\Factory\RegionFactory;
 use Xibo\Factory\TransitionFactory;
 use Xibo\Factory\WidgetFactory;
+use Xibo\Helper\HttpsDetect;
+use Xibo\Middleware\TokenAuthMiddleware;
+use Xibo\Service\JwtServiceInterface;
 use Xibo\Support\Exception\AccessDeniedException;
 use Xibo\Support\Exception\ControllerNotImplemented;
 use Xibo\Support\Exception\GeneralException;
@@ -80,7 +83,8 @@ class Region extends Base
         $widgetFactory,
         $transitionFactory,
         $moduleFactory,
-        $layoutFactory
+        $layoutFactory,
+        private readonly JwtServiceInterface $jwtService,
     ) {
         $this->regionFactory = $regionFactory;
         $this->widgetFactory = $widgetFactory;
@@ -620,6 +624,7 @@ class Region extends Base
 
             // Output a preview
             $module = $this->moduleFactory->getByType($widget->type);
+            $baseUrl = (new HttpsDetect())->getBaseUrl($request);
             $this->getState()->html = $this->moduleFactory
                 ->createWidgetHtmlRenderer()
                 ->preview(
@@ -627,14 +632,21 @@ class Region extends Base
                     $region,
                     $widget,
                     $sanitizedQuery,
-                    $this->urlFor(
+                    $baseUrl . '/preview/playlist/widget/resource/' . $region->regionId . '/' . $widget->widgetId
+                        . '?preview=1&jwt='
+                        . $this->jwtService->generateJwt(
+                            'Preview',
+                            'layout',
+                            $region->layoutId,
+                            '/preview/layout/preview/' . $region->layoutId,
+                            3600,
+                        )->toString(),
+                    TokenAuthMiddleware::sign(
                         $request,
-                        'library.download',
-                        [
-                            'regionId' => $region->regionId,
-                            'id' => $widget->getPrimaryMedia()[0] ?? null
-                        ]
-                    ) . '?preview=1',
+                        '/preview/library/download/' . ($widget->getPrimaryMedia()[0] ?? null),
+                        time() + 3600,
+                        $this->getConfig()->getApiKeyDetails()['encryptionKey'],
+                    ) . '&preview=1',
                     $additionalContexts
                 );
             $this->getState()->extra['countOfWidgets'] = $countWidgets;
