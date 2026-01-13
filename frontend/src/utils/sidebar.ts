@@ -19,10 +19,14 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
 .*/
 
-import { RouterProvider } from 'react-router-dom';
+import type { AppRoute } from '@/config/appRoutes';
 
-import { router } from '@/routes';
+export function isRouteActive(route: AppRoute, pathname: string): boolean {
+  if (pathname === `/${route.path}`) return true;
 
-export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    route.subLinks?.some(
+      (sub) => pathname === `/${sub.path}` || pathname === `/${route.path}/${sub.path}`,
+    ) ?? false
+  );
 }
