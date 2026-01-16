@@ -520,25 +520,11 @@ class MediaFactory extends BaseFactory
 
         if ($sortOrder === null) {
             $sortOrder = ['name'];
+        } else {
+            $sortOrder = $this->buildSortQuery($sortOrder);
         }
-
-        $newSortOrder = [];
-        foreach ($sortOrder as $sort) {
-            if ($sort == '`revised`') {
-                $newSortOrder[] = '`parentId`';
-                continue;
-            }
-
-            if ($sort == '`revised` DESC') {
-                $newSortOrder[] = '`parentId` DESC';
-                continue;
-            }
-            $newSortOrder[] = $sort;
-        }
-        $sortOrder = $newSortOrder;
 
         $entries = [];
-
         $params = [];
         $select = '
             SELECT `media`.mediaId,
@@ -1010,5 +996,55 @@ class MediaFactory extends BaseFactory
         }
 
         return $entries;
+    }
+
+    /**
+     * Sanitize and build the sort query
+     * @param array|null $sortOrder
+     * @return array|null
+     */
+    private function buildSortQuery(?array $sortOrder): ?array
+    {
+        $allowedColumns = [
+            'mediaId', 'name', 'type', 'duration', 'fileSize', 'owner', 'sharing', 'released', 'fileName',
+            'enableStat', 'createdDt', 'modifiedDt', 'expires'
+        ];
+
+        $columnMapping = [];
+
+        foreach ($allowedColumns as $col) {
+            $columnMapping[$col] = '`' . $col . '`';
+        }
+
+        // Map and add the other params in the allowed columns
+        $columnMapping += [
+            'revised'           => '`parentId`',
+            'formattedDuration' => '`duration`',
+            'durationSeconds'   => '`duration`',
+            'fileSizeFormatted' => '`fileSize`',
+            'mediaType'         => 'media.`type`',
+            'resolution'        => '(media.`width` * media.`height`)'
+        ];
+
+        $order = [];
+
+        foreach ($sortOrder as $sort) {
+            $sortArr = explode(' ', trim($sort), 2);
+
+            $column = trim($sortArr[0], '`');
+
+            // Check against the allowed columns
+            if (!isset($columnMapping[$column])) {
+                continue;
+            }
+
+            $dir = (isset($sortArr[1]) && strtoupper(trim($sortArr[1])) === 'DESC')
+                ? ' DESC'
+                : ' ASC';
+
+            $order[] = $columnMapping[$column] . $dir;
+        }
+
+        return $order ?? null;
     }
 }
