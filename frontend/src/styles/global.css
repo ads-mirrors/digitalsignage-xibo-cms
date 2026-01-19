@@ -71,4 +71,8 @@ body,
   .nav_link {
     @apply font-medium text-[14px] flex items-center flex-row;
   }
+
+  .center {
+    @apply items-center justify-center flex;
+  }
 }
