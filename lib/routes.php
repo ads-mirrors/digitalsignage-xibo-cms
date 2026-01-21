@@ -95,7 +95,9 @@ $app->post('/tfa', ['\Xibo\Controller\Login' , 'twoFactorAuthValidate'])->setNam
  * )
  */
 $app->get('/schedule', ['\Xibo\Controller\Schedule','grid'])->setName('schedule.search');
+// ⚠️ Deprecated: This route will be removed in v5.0
 $app->get('/schedule/data/events', ['\Xibo\Controller\Schedule','eventData'])->setName('schedule.calendar.data');
+
 $app->get('/schedule/{id}/events', ['\Xibo\Controller\Schedule','eventList'])->setName('schedule.events');
 
 $app->post('/schedule', ['\Xibo\Controller\Schedule','add'])
@@ -348,8 +350,6 @@ $app->group('', function (RouteCollectorProxy $group) {
 
 $app->get('/library/download/{id}', ['\Xibo\Controller\Library', 'download'])->setName('library.download');
 $app->get('/library/thumbnail/{id}', ['\Xibo\Controller\Library', 'thumbnail'])->setName('library.thumbnail');
-$app->get('/public/thumbnail/{id}', ['\Xibo\Controller\Library', 'thumbnailPublic'])
-    ->setName('library.public.thumbnail');
 
 $app->post('/library', ['\Xibo\Controller\Library','add'])->setName('library.add')
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['library.add', 'dashboard.playlist']));
@@ -650,11 +650,6 @@ $app->get('/module', ['\Xibo\Controller\Module','grid'])->setName('module.search
 $app->get('/module/templates/{dataType}', [
     '\Xibo\Controller\Module', 'templateGrid'
 ])->setName('module.template.search');
-
-$app->get('/module/asset/{assetId}', [
-    '\Xibo\Controller\Module',
-    'assetDownload',
-])->setName('module.asset.download');
 
 // Properties
 $app->get('/module/properties/{id}', ['\Xibo\Controller\Module','getProperties'])

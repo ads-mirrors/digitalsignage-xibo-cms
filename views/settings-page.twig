@@ -46,8 +46,8 @@
                         <li class="nav-item"><a class="nav-link" href="#tab_general" role="tab" data-toggle="tab"><span>{% trans "General" %}</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab_maint" role="tab" data-toggle="tab"><span>{% trans "Maintenance" %}</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab_network" role="tab" data-toggle="tab"><span>{% trans "Network" %}</span></a></li>
-                        <li class="nav-item"><a class="nav-link" href="#tab_permissions" role="tab" data-toggle="tab"><span>{% trans "Sharing" %}</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab_regional" role="tab" data-toggle="tab"><span>{% trans "Regional" %}</span></a></li>
+                        <li class="nav-item"><a class="nav-link" href="#tab_permissions" role="tab" data-toggle="tab"><span>{% trans "Sharing" %}</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab_troubleshooting" role="tab" data-toggle="tab"><span>{% trans "Troubleshooting" %}</span></a></li>
                         <li class="nav-item"><a class="nav-link" href="#tab_users" role="tab" data-toggle="tab"><span>{% trans "Users" %}</span></a></li>
                     </ul>
@@ -643,9 +643,21 @@
 
                                 {% if theme.isSettingVisible("INSTANCE_SUSPENDED") %}
                                     {% set title %}{% trans "Instance Suspended" %}{% endset %}
-                                    {% set helpText %}{% trans "Is this instance suspended?" %}{% endset %}
+                                    {% set helpText %}{% trans "Is this instance suspended? Warning: Direct database access will be required to reactivate the CMS if you select Yes" %}{% endset %}
 
-                                    {{ forms.checkbox("INSTANCE_SUSPENDED", title, theme.getSetting("INSTANCE_SUSPENDED", 0), helpText, "", "", not theme.isSettingEditable("INSTANCE_SUSPENDED")) }}
+                                    {% set noOption %}{% trans "No" %}{% endset %}
+                                    {% set partialOption %}{% trans "Partially" %}{% endset %}
+                                    {% set yesOption %}{% trans "Yes" %}{% endset %}
+                                    {% set options = [
+                                        { id: "no", value: noOption },
+                                        { id: "partial", value: partialOption },
+                                        { id: "yes", value: yesOption }
+                                    ] %}
+                                    {% if theme.isSettingEditable("INSTANCE_SUSPENDED") %}
+                                        {{ forms.dropdown("INSTANCE_SUSPENDED", "single", title, theme.getSetting("INSTANCE_SUSPENDED", "No"), options, "id", "value", helpText) }}
+                                    {% else %}
+                                        {{ forms.disabled("INSTANCE_SUSPENDED", title, theme.getSetting("INSTANCE_SUSPENDED", "No"), helpText) }}
+                                    {% endif %}
                                 {% endif %}
 
                                 {% if theme.isSettingVisible("LATEST_NEWS_URL") %}

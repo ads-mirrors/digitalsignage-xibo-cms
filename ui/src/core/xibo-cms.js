@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -154,7 +154,7 @@ window.XiboInitialise = function(scope, options) {
     .on('mouseenter', function(ev) {
       const formUrl = $(ev.currentTarget).attr('href');
 
-      XiboHoverRender(formUrl, e.pageX, e.pageY);
+      XiboHoverRender(formUrl, ev.pageX, ev.pageY);
 
       return false;
     }).on('mouseleave', function() {
@@ -267,7 +267,9 @@ window.XiboInitialise = function(scope, options) {
     if (anchor !== undefined && anchor !== '') {
       makePagedSelect($target, $(anchor));
     } else if (inModal) {
-      makePagedSelect($target, $(scope));
+      const $modalBody = $(scope).find('.modal-body');
+
+      makePagedSelect($target, $modalBody.length ? $modalBody : $(scope));
     } else {
       makePagedSelect($target, $('body'));
     }
@@ -292,10 +294,10 @@ window.XiboInitialise = function(scope, options) {
   });
 
   // Colour picker
-  $(scope + ' .colorpicker-input:not(.colorpicker-element)')
+  $(scope + ' .colorpicker-input:not(.colorpicker-form-element)')
     .each(function(_i, el) {
       $(el).colorpicker({
-        container: $(el).parent(),
+        container: $(el).find('.picker-container'),
       });
     });
 
@@ -853,7 +855,7 @@ window.XiboInitialise = function(scope, options) {
 
                       bodyElements.forEach((element) => {
                         const elementSplit = element.split('=');
-                        if (elementSplit.length = 2) {
+                        if (elementSplit.length == 2) {
                           newParsedElements[elementSplit[0]] = elementSplit[1];
                         }
                       });
@@ -1221,222 +1223,6 @@ window.XiboInitialise = function(scope, options) {
         }
       }, 200);
     });
-
-  $(scope + ' #fullScreenCampaignId').each(function(_idx, el) {
-    const $form = $(el).closest('form');
-    const eventTypeId = parseInt($form.find('#eventTypeId').val());
-    const mediaId = $form.find('#fullScreen-mediaId').val();
-    const playlistId = $form.find('#fullScreen-playlistId').val();
-    let dataObj = {};
-    let url;
-
-    if (mediaId !== null && mediaId !== undefined && mediaId !== '') {
-      dataObj = {
-        mediaId: mediaId,
-      };
-      url = $form.data().libraryGetUrl;
-    } else if (
-      playlistId != null &&
-      playlistId != undefined &&
-      playlistId !== ''
-    ) {
-      dataObj = {
-        playlistId: playlistId,
-      };
-      url = $form.data().playlistGetUrl;
-    }
-
-    // get selected media or playlist details
-    if (url != null && [7, 8].includes(eventTypeId)) {
-      $.ajax({
-        type: 'GET',
-        url: url,
-        cache: false,
-        dataType: 'json',
-        data: dataObj,
-      })
-        .then(
-          (response) => {
-            if (!response.success) {
-              SystemMessageInline(
-                (response.message === '') ?
-                  translations.failure : response.message,
-                $form.closest('.modal'),
-              );
-            }
-
-            // at the moment we only add media
-            // or playlist name to readonly input
-            // this might be extended in the future.
-            if (eventTypeId == 7) {
-              $form.find('#fullScreen-media').val(response.data[0].name);
-            } else if (eventTypeId == 8) {
-              $form.find('#fullScreen-playlist').val(response.data[0].name);
-            }
-
-            if (response.data[0]?.fullScreenCampaignId) {
-              $form.find('#fullScreenCampaignId')
-                .val(response.data[0].fullScreenCampaignId)
-                .trigger('change');
-            }
-
-            if (!response.data[0]?.hasFullScreenLayout) {
-              if (eventTypeId == 7) {
-                $form.find('#fullScreenControl_media').trigger('autoOpen');
-              } else if (eventTypeId == 8) {
-                $form.find('#fullScreenControl_playlist').trigger('autoOpen');
-              }
-            }
-          }, (xhr) => {
-            SystemMessage(xhr.responseText, false);
-          });
-    }
-  });
-
-  $(scope + ' .full-screen-layout-form').on('click autoOpen', function(ev) {
-    const $target = $(ev.currentTarget);
-
-    if ($('#full-screen-schedule-modal').length != 0) {
-      $('#full-screen-schedule-modal').remove();
-    }
-
-    const $mainModal = $target.parents(scope);
-    const eventTypeId = $target.closest('form').find('#eventTypeId').val();
-    const mediaId = $target.closest('form').find('#fullScreen-mediaId').val();
-    const playlistId =
-      $target.closest('form').find('#fullScreen-playlistId').val();
-    const readOnlySelect = $target.data('readonly');
-
-    if ($('#full-screen-schedule-modal').length === 0) {
-      const config = {
-        type: eventTypeId == 7 ? 'Media' : 'Playlist',
-        eventTypeId: eventTypeId,
-        readonlySelect: readOnlySelect,
-      };
-
-      $('body').append(templates.schedule.fullscreenSchedule(
-        {
-          ...config,
-          ...{
-            trans: translations.schedule.fullscreen,
-          },
-          ...{
-            fullscreenSchedule: fullscreenSchedule,
-          },
-        }));
-      const $modal = $('#full-screen-schedule-modal');
-
-      // If form was opened automatically
-      // close background modal if we close this one
-      if (ev.type === 'autoOpen') {
-        $modal.find('button.close').on('click', function() {
-          $mainModal.modal('hide');
-        });
-      }
-
-      $modal
-        .on('show.bs.modal', function() {
-          $('.no-full-screen-layout').addClass('d-none');
-        })
-        .on('shown.bs.modal', function() {
-          const $form = $modal.find('form');
-          // set initial values if we have any
-          $form.find('.pagedSelect select.form-control')
-            .each(function(_idx, el) {
-              const $target2 = $(el);
-              if (
-                $target2.attr('name') == 'mediaId' && mediaId != null
-              ) {
-                $target2.data('initialValue', mediaId);
-              } else if (
-                $target2.attr('name') == 'playlistId' && playlistId != null
-              ) {
-                $target2.data('initialValue', playlistId);
-              }
-
-              // init select2
-              makePagedSelect($target2, '#' + $form.attr('id'));
-            });
-
-          // init color picker
-          $form.find('.colorpicker-input:not(.colorpicker-element)')
-            .each(function(_idx, el) {
-              $(el).colorpicker({
-                container: $(el).parent(),
-              });
-            });
-
-          // change input visibility depending on
-          // what we selected for media/playlist
-          $('#mediaId, #playlistId', $form)
-            .on('select2:select', function(event) {
-              let hasFullScreenLayout = false;
-              if (event.params.data.data !== undefined) {
-                hasFullScreenLayout =
-                  event.params.data.data[0].hasFullScreenLayout;
-              } else if (event.params.data.hasFullScreenLayout !== undefined) {
-                hasFullScreenLayout = event.params.data.hasFullScreenLayout;
-              }
-
-              if (hasFullScreenLayout) {
-                $('.no-full-screen-layout').addClass('d-none');
-              } else {
-                if ($(event.currentTarget).attr('name') === 'mediaId') {
-                  $('.no-full-screen-layout').removeClass('d-none');
-                } else {
-                  $('.no-full-screen-layout.media-playlist-control')
-                    .removeClass('d-none');
-                }
-              }
-            });
-
-          if (readOnlySelect) {
-            $form.find('#mediaId, #playlistId').prop('disabled', true);
-          }
-
-          // resolution helpText changes depending
-          // if we are on playlist or media event
-          const $resolutionControl = $('.resolution-control');
-          const $resolutionSelect = $form.find('#resolutionId');
-          if (eventTypeId == 7) {
-            $resolutionControl
-              .children('div')
-              .children('small.form-text.text-muted')
-              .text($resolutionSelect.data('transMediaHelpText'));
-          } else if (eventTypeId == 8) {
-            $resolutionControl
-              .children('div')
-              .children('small.form-text.text-muted')
-              .text($resolutionSelect.data('transPlaylistHelpText'));
-          }
-
-          // confirmation button was pressed
-          // create or fetch the Layout for selected media or playllist
-          // this will populate fullScreenCampaignId hidden input
-          // and close this modal once everything is done
-          $('#btnFullScreenLayoutConfirm').on('click', function(e) {
-            e.preventDefault();
-            fullscreenBeforeSubmit($form);
-          });
-
-          // Initialize fields
-          XiboInitialise('#scheduleFullScreenForm');
-        })
-        .on('hidden.bs.modal', function(ev) {
-          // Fix for 2nd/overlay modal
-          $('.modal:visible').length && $(document.body).addClass('modal-open');
-
-          $(ev.currentTarget).data('bs.modal', null);
-        });
-
-      // Open modal programmatically
-      $modal.modal({
-        backdrop: 'static',
-        keyboard: false,
-        show: true,
-      });
-    }
-  });
 
   // Initalise remaining form fields
   if (forms && typeof forms.initFields === 'function') {
@@ -1904,6 +1690,7 @@ window.XiboMultiSelectFormRender = function(button) {
   // Get a list of buttons that match the ID
   const matches = [];
   let formOpenCallback = null;
+  let formConfirm = null;
 
   $('.' + buttonId).each(function(_idx, el) {
     const $button = $(el);
@@ -3006,32 +2793,46 @@ window.destroyDatePicker = function($element) {
   $element.parent().find('.date-open-button').off('click');
 };
 
-window.updateRangeFilter = function($element, $from, $to, callBack) {
-  let value = $element.val();
-  let from;
-  let to;
-  const isCustom = value === 'custom';
-  const isPast = value.includes('last');
+window.updateRangeFilter = function(
+  $element,
+  $from,
+  $to,
+  callBack,
+  options = {},
+) {
+  const value = $element.val();
 
-  if (value === 'agenda') {
-    value = 'day';
-  }
-
-  if (isCustom) {
+  if (value === 'custom') {
     $('.custom-date-range').removeClass('d-none');
+    $('.controls-date-range').addClass('d-none');
   } else {
     $('.custom-date-range').addClass('d-none');
+    $('.controls-date-range').removeClass('d-none');
 
-    if (!isPast) {
-      from = moment().startOf(value).format(jsDateFormat);
-      to = moment().endOf(value).format(jsDateFormat);
+    const {direction, date: customDate} = options;
+    let baseDate;
+
+    if (customDate && moment(customDate).isValid()) {
+      baseDate = moment(customDate);
+    } else if (!direction || direction === 'today') {
+      baseDate = moment();
     } else {
-      const pastValue = value.replace('last', '');
-      from = moment().startOf(pastValue)
-        .subtract(1, pastValue + 's').format(jsDateFormat);
-      to = moment().endOf(pastValue)
-        .subtract(1, pastValue + 's').format(jsDateFormat);
+      const fromDate = moment($from.val());
+      if (fromDate && fromDate.isValid()) {
+        baseDate = fromDate;
+      } else {
+        baseDate = moment();
+      }
+
+      if (direction === 'next') {
+        baseDate.add(1, value);
+      } else if (direction === 'prev') {
+        baseDate.subtract(1, value);
+      }
     }
+
+    const from = baseDate.clone().startOf(value).format(jsDateFormat);
+    const to = baseDate.clone().endOf(value).format(jsDateFormat);
 
     updateDatePicker($from, from, jsDateFormat, true);
     updateDatePicker($to, to, jsDateFormat, true);
@@ -3059,8 +2860,8 @@ window.createMiniLayoutPreview = function(previewUrl) {
   // Create base template for preview content
   const previewTemplate =
     Handlebars.compile(
-      '<iframe scrolling="no" src="{{url}}" width="{{width}}px" ' +
-      'height="{{height}}px" style="border:0;"></iframe>');
+      '<iframe scrolling="no" sandbox="allow-scripts" src="{{url}}" ' +
+      'width="{{width}}px" height="{{height}}px" style="border:0;"></iframe>');
 
   // Clean all selected elements
   $layoutPreviewContent.html('');
@@ -3096,10 +2897,10 @@ window.createMiniLayoutPreview = function(previewUrl) {
 
     // Change icon based on size state
     $(ev.currentTarget).toggleClass(
-      'fa-arrow-circle-down', $layoutPreview.hasClass('large'),
+      'fa-minus-square', $layoutPreview.hasClass('large'),
     );
     $(ev.currentTarget).toggleClass(
-      'fa-arrow-circle-up', !$layoutPreview.hasClass('large'),
+      'fa-plus-square', !$layoutPreview.hasClass('large'),
     );
     // Re-show play button
     $layoutPreview.find('#playBtn').show();

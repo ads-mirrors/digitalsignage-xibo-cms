@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2025 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -48,11 +48,12 @@ use Xibo\Factory\UserGroupFactory;
 use Xibo\Factory\WidgetDataFactory;
 use Xibo\Factory\WidgetFactory;
 use Xibo\Helper\DateFormatHelper;
-use Xibo\Helper\Environment;
+use Xibo\Helper\HttpsDetect;
 use Xibo\Helper\LayoutUploadHandler;
 use Xibo\Helper\Profiler;
 use Xibo\Helper\SendFile;
 use Xibo\Helper\Status;
+use Xibo\Service\JwtServiceInterface;
 use Xibo\Service\MediaService;
 use Xibo\Service\MediaServiceInterface;
 use Xibo\Support\Exception\AccessDeniedException;
@@ -60,7 +61,6 @@ use Xibo\Support\Exception\GeneralException;
 use Xibo\Support\Exception\InvalidArgumentException;
 use Xibo\Support\Exception\NotFoundException;
 use Xibo\Widget\Render\WidgetDownloader;
-use Xibo\Widget\SubPlaylistItem;
 
 /**
  * Class Layout
@@ -157,6 +157,7 @@ class Layout extends Base
         WidgetFactory $widgetFactory,
         private readonly WidgetDataFactory $widgetDataFactory,
         PlaylistFactory $playlistFactory,
+        private readonly JwtServiceInterface $jwtService,
     ) {
         $this->session = $session;
         $this->userFactory = $userFactory;
@@ -224,8 +225,9 @@ class Layout extends Base
         $layout = $this->layoutFactory->loadById($id);
         $sanitizedParams = $this->getSanitizer($request->getParams());
 
-        if (!$this->getUser()->checkEditable($layout))
+        if (!$this->getUser()->checkEditable($layout)) {
             throw new AccessDeniedException();
+        }
 
         // Get the parent layout if it's editable
         if ($layout->isEditable()) {
@@ -240,10 +242,15 @@ class Layout extends Base
             } else {
                 $resolution = $this->resolutionFactory->getByDimensions($layout->width, $layout->height);
             }
-        } catch (NotFoundException $notFoundException) {
-            $this->getLog()->info('Layout Editor with an unknown resolution, we will create it with name: ' . $layout->width . ' x ' . $layout->height);
+        } catch (NotFoundException) {
+            $this->getLog()->info('Layout Editor with an unknown resolution, we will create it with name: '
+                . $layout->width . ' x ' . $layout->height);
 
-            $resolution = $this->resolutionFactory->create($layout->width . ' x ' . $layout->height, (int)$layout->width, (int)$layout->height);
+            $resolution = $this->resolutionFactory->create(
+                $layout->width . ' x ' . $layout->height,
+                (int)$layout->width,
+                (int)$layout->height
+            );
             $resolution->userId = $this->userFactory->getSystemUser()->userId;
             $resolution->save();
         }
@@ -268,6 +275,13 @@ class Layout extends Base
             ]),
             'modules' => $moduleFactory->getAssignableModules(),
             'timeZones' => $timeZones,
+            'previewJwt' => $this->jwtService->generateJwt(
+                'Preview',
+                'layout',
+                $layout->layoutId,
+                '/preview/layout/preview/' . $layout->layoutId,
+                3600,
+            )->toString(),
         ];
 
         // Call the render the template
@@ -362,7 +376,7 @@ class Layout extends Base
         $name = $sanitizedParams->getString('name');
         $description = $sanitizedParams->getString('description');
         $enableStat = $sanitizedParams->getCheckbox('enableStat');
-        $autoApplyTransitions = $this->getConfig()->getSetting('DEFAULT_TRANSITION_AUTO_APPLY');
+        $autoApplyTransitions = (int)$this->getConfig()->getSetting('DEFAULT_TRANSITION_AUTO_APPLY');
         $code = $sanitizedParams->getString('code', ['defaultOnEmptyString' => true]);
 
         // Folders
@@ -439,7 +453,7 @@ class Layout extends Base
         // Do we have an 'Enable Layout Stats Collection?' checkbox?
         // If not, we fall back to the default Stats Collection setting.
         if (!$sanitizedParams->hasParam('enableStat')) {
-            $enableStat = $this->getConfig()->getSetting('LAYOUT_STATS_ENABLED_DEFAULT');
+            $enableStat = (int)$this->getConfig()->getSetting('LAYOUT_STATS_ENABLED_DEFAULT');
         }
 
         // Set layout enableStat flag
@@ -753,6 +767,18 @@ class Layout extends Base
         $layout->backgroundImageId = $sanitizedParams->getInt('backgroundImageId');
         $layout->backgroundzIndex = $sanitizedParams->getInt('backgroundzIndex');
         $layout->autoApplyTransitions = $sanitizedParams->getCheckbox('autoApplyTransitions');
+
+        // Check the status of the media file
+        if ($layout->backgroundImageId) {
+            $media = $this->mediaFactory->getById($layout->backgroundImageId);
+
+            if ($media->mediaType === 'image' && $media->released === 2) {
+                throw new InvalidArgumentException(sprintf(
+                    __('%s set as the layout background image is too large. Please ensure that none of the images in your layout are larger than your Resize Limit on their longest edge.'),//phpcs:ignore
+                    $media->name
+                ));
+            }
+        }
 
         // Resolution
         $saveRegions = false;
@@ -1553,6 +1579,7 @@ class Layout extends Base
         $parsedQueryParams = $this->getSanitizer($request->getQueryParams());
         // Should we parse the description into markdown
         $showDescriptionId = $parsedQueryParams->getInt('showDescriptionId');
+        $baseUrl = (new HttpsDetect())->getBaseUrl($request);
 
         // We might need to embed some extra content into the response if the "Show Description"
         // is set to media listing
@@ -1831,12 +1858,20 @@ class Layout extends Base
 
             // Preview
             if ($this->getUser()->featureEnabled('layout.view')) {
+                $jwt = $this->jwtService->generateJwt(
+                    'Preview',
+                    'layout',
+                    $layout->layoutId,
+                    '/preview/layout/preview/' . $layout->layoutId,
+                    3600,
+                )->toString();
+
                 $layout->buttons[] = array(
                     'id' => 'layout_button_preview',
                     'external' => true,
                     'url' => '#',
                     'onclick' => 'createMiniLayoutPreview',
-                    'onclickParam' => $this->urlFor($request, 'layout.preview', ['id' => $layout->layoutId]),
+                    'onclickParam' => $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt,
                     'text' => __('Preview Layout')
                 );
 
@@ -1847,7 +1882,8 @@ class Layout extends Base
                         'external' => true,
                         'url' => '#',
                         'onclick' => 'createMiniLayoutPreview',
-                        'onclickParam' => $this->urlFor($request, 'layout.preview', ['id' => $layout->layoutId]) . '?isPreviewDraft=true',
+                        'onclickParam' => $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt
+                            . '&isPreviewDraft=true',
                         'text' => __('Preview Draft Layout')
                     );
                 }
@@ -2742,7 +2778,7 @@ class Layout extends Base
 
         $layout = $this->layoutFactory->getById($id);
 
-        if (!$this->getUser()->checkViewable($layout)) {
+        if (!$this->getUser()->checkViewable($layout) && $request->getAttribute('authedViaToken') !== true) {
             throw new AccessDeniedException();
         }
 
@@ -3494,161 +3530,33 @@ class Layout extends Base
     {
         $params = $this->getSanitizer($request->getParams());
         $type = $params->getString('type');
-        $media = null;
-        $playlist = null;
-        $playlistItems = [];
+        $id = $params->getInt('id');
+        $resolutionId = $params->getInt('resolutionId');
+        $backgroundColor = $params->getString('backgroundColor');
+        $duration = $params->getInt('layoutDuration');
 
-        if (empty($params->getInt('id'))) {
+        if (empty($id)) {
             throw new InvalidArgumentException(sprintf(__('Please select %s'), ucfirst($type)));
         }
 
-        if ($type === 'media') {
-            $media = $this->mediaFactory->getById($params->getInt('id'));
-            // do we already have a full screen layout with this media?
-            $layoutExists = $this->layoutFactory->getLinkedFullScreenLayout('media', $media->mediaId);
-        } else if ($type === 'playlist') {
-            $playlist = $this->playlistFactory->getById($params->getInt('id'));
-            $playlist->load();
-            // do we already have a full screen layout with this playlist?
-            $layoutExists = $this->layoutFactory->getLinkedFullScreenLayout('playlist', $playlist->playlistId);
+        // We only create fullscreen layout from media files or playlist
+        if (!in_array($type, ['media', 'playlist'], true)) {
+            throw new InvalidArgumentException(__('Invalid type'));
         }
 
-        if (!empty($layoutExists)) {
-            // Return
-            $this->getState()->hydrate([
-                'httpStatus' => 200,
-                'message' => sprintf(__('Fetched %s'), $layoutExists->layout),
-                'data' => $layoutExists
-            ]);
-
-            return $this->render($request, $response);
-        }
-
-        $resolutionId = $params->getInt('resolutionId');
-
-        if (empty($resolutionId)) {
-            if ($type === 'media') {
-                $resolutionId = $this->resolutionFactory->getClosestMatchingResolution(
-                    $media->width,
-                    $media->height
-                )->resolutionId;
-            } else if ($type === 'playlist') {
-                $resolutionId = $this->resolutionFactory->getClosestMatchingResolution(
-                    1920,
-                    1080
-                )->resolutionId;
-            }
-        }
-
-        $layout = $this->layoutFactory->createFromResolution(
+        $fullscreenLayout = $this->layoutFactory->createFullScreenLayout(
+            $type,
+            $id,
             $resolutionId,
-            $this->getUser()->userId,
-            $type . '_' .
-            ($type === 'media' ? $media->name : $playlist->name) .
-            '_' . ($type === 'media' ? $media->mediaId : $playlist->playlistId),
-            'Full Screen Layout created from ' . ($type === 'media' ? $media->name : $playlist->name),
-            '',
-            null,
-            false
+            $backgroundColor,
+            $duration
         );
-
-        if (!empty($params->getString('backgroundColor'))) {
-            $layout->backgroundColor = $params->getString('backgroundColor');
-        }
-
-        $this->layoutFactory->addRegion(
-            $layout,
-            $type === 'media' ? 'frame' : 'playlist',
-            $layout->width,
-            $layout->height,
-            0,
-            0
-        );
-
-        $layout->setUnmatchedProperty('type', $type);
-        $layout->autoApplyTransitions = 0;
-        $layout->schemaVersion = Environment::$XLF_VERSION;
-        $layout->folderId = ($type === 'media') ? $media->folderId : $playlist->folderId;
-
-        // Media files have their own validation so we can skip
-        $layout->save(['validate' => false]);
-
-        $draft = $this->layoutFactory->checkoutLayout($layout);
-
-        $region = $draft->regions[0];
-
-        // Create a module
-        $module = $this->moduleFactory->getByType($type === 'media' ? $media->mediaType : 'subplaylist');
-
-        // Determine the duration
-        // if we have a duration provided, then use it, otherwise use the duration recorded on the
-        // library item/playlist already
-        $itemDuration = $params->getInt(
-            'layoutDuration',
-            ['default' => $type === 'media' ? $media->duration : $playlist->duration]
-        );
-
-        // If the library item duration (or provided duration) is 0, then default to the Module Default
-        // Duration as configured in settings.
-        $itemDuration = ($itemDuration == 0) ? $module->defaultDuration : $itemDuration;
-
-        // Create a widget
-        $widget = $this->widgetFactory->create(
-            $this->getUser()->userId,
-            $region->getPlaylist()->playlistId,
-            $type === 'media' ? $media->mediaType : 'subplaylist',
-            $itemDuration,
-            $module->schemaVersion
-        );
-
-        if ($type === 'playlist') {
-            // save here, simulate add Widget
-            // next save (with playlist) will edit and save the Widget and dispatch event that manages closure table.
-            $widget->save();
-            $item = new SubPlaylistItem();
-            $item->rowNo = 1;
-            $item->playlistId = $playlist->playlistId;
-            $item->spotFill = 'repeat';
-            $item->spotLength =  '';
-            $item->spots = '';
-
-            $playlistItems[] = $item;
-            $widget->setOptionValue('subPlaylists', 'attrib', json_encode($playlistItems));
-        } else {
-            $widget->useDuration = 1;
-            $widget->assignMedia($media->mediaId);
-        }
-
-        // Calculate the duration
-        $widget->calculateDuration($module);
-
-        // Set loop for media items with custom duration
-        if ($type === 'media' && $media->mediaType === 'video' && $itemDuration > $media->duration) {
-            $widget->setOptionValue('loop', 'attrib', 1);
-            $widget->save();
-        }
-
-        // Assign the widget to the playlist
-        $region->getPlaylist()->assignWidget($widget);
-        // Save the playlist
-        $region->getPlaylist()->save();
-        $region->save();
-
-        // look up the record in the database
-        // as we do not set modifiedDt on the object on save.
-        $draft = $this->layoutFactory->getByParentId($layout->layoutId);
-        $draft->publishDraft();
-        $draft->load();
-
-        // We also build the XLF at this point, and if we have a problem we prevent publishing and raise as an
-        // error message
-        $draft->xlfToDisk(['notify' => true, 'exceptionOnError' => true, 'exceptionOnEmptyRegion' => false]);
 
         // Return
         $this->getState()->hydrate([
             'httpStatus' => 200,
-            'message' => sprintf(__('Created %s'), $draft->layout),
-            'data' => $draft
+            'message' => sprintf(__('Created %s'), $fullscreenLayout->layout),
+            'data' => $fullscreenLayout
         ]);
 
         return $this->render($request, $response);

@@ -686,26 +686,7 @@ Toolbar.prototype.init = function(
               .providerTitle.replace('%obj%', provider.id),
             itemIcon: provider.iconUrl,
             contentType: 'media',
-            filters: {
-              name: {
-                value: '',
-                key: 'media',
-              },
-              type: {
-                value: '',
-                hideDefault: true,
-                values: provider.mediaTypes.map((media) => {
-                  return {
-                    name: toolbarTrans.libraryTypes[media],
-                    type: media,
-                    disabled: false,
-                  };
-                }),
-              },
-              orientation: {
-                value: '',
-              },
-            },
+            filters: self.loadProviderFilters(provider.filters),
             state: '',
             itemCount: 0,
           });
@@ -1753,6 +1734,24 @@ Toolbar.prototype.mediaContentPopulate = function(menu) {
       filter.types = self.moduleListOtherFiltered.map((el) => el.type);
     }
 
+    // If this is from a provider, we may need to update the filters
+    if (self.menuItems[menu].provider && self.menuItems[menu].filters) {
+      const filterList = self.menuItems[menu].filters;
+
+      // Does this filter have visibility conditions?
+      Object.values(filterList).forEach((filter) => {
+        if (filter.hasOwnProperty('visibility')) {
+          forms.setConditions(
+            `#content-${menu} .toolbar-search-form`,
+            filterList,
+            filter.visibility.field,
+            false,
+            true,
+          );
+        }
+      });
+    }
+
     // Manage request length
     const requestLength = 15;
 
@@ -1933,7 +1932,7 @@ Toolbar.prototype.mediaContentPopulate = function(menu) {
           $mediaContent.masonry('layout');
 
           // Show more button
-          if (res.data.length > 0) {
+          if (res.data.length === requestLength) {
             if ($mediaContent.parent().find('.show-more').length == 0) {
               const $showMoreBtn =
                 $('<button class="btn btn-block btn-white show-more">' +
@@ -1945,7 +1944,7 @@ Toolbar.prototype.mediaContentPopulate = function(menu) {
                 loadData(false);
               });
             }
-          } else {
+          } else if (res.data.length === 0) {
             toastr.info(
               toolbarTrans.noShowMore,
               null,
@@ -2630,7 +2629,7 @@ Toolbar.prototype.layoutTemplatesContentPopulate = function(menu) {
             $content.masonry('layout');
 
             // Show more button
-            if (response.data.length > 0) {
+            if (response.data.length === requestLength) {
               if ($content.parent().find('.show-more').length == 0) {
                 const $showMoreBtn =
                   $('<button class="btn btn-block btn-white show-more">' +
@@ -2642,7 +2641,7 @@ Toolbar.prototype.layoutTemplatesContentPopulate = function(menu) {
                   loadData(false);
                 });
               }
-            } else {
+            } else if (response.data.length === 0) {
               toastr.info(
                 toolbarTrans.noShowMore,
                 null,
@@ -2873,7 +2872,7 @@ Toolbar.prototype.playlistsContentPopulate = function(menu) {
           $content.find('.toolbar-card').removeClass('hide-content');
 
           // Show more button
-          if (response.data.length > 0) {
+          if (response.data.length === requestLength) {
             if ($content.parent().find('.show-more').length == 0) {
               const $showMoreBtn =
                 $('<button class="btn btn-block btn-white show-more">' +
@@ -2885,7 +2884,7 @@ Toolbar.prototype.playlistsContentPopulate = function(menu) {
                 loadData(false);
               });
             }
-          } else {
+          } else if (response.data.length === 0) {
             toastr.info(
               toolbarTrans.noShowMore,
               null,
@@ -3713,6 +3712,49 @@ Toolbar.prototype.getMenuIdFromType = function(
   type,
 ) {
   return this.menuItems.findIndex((item) => item.name === type);
+};
+
+/**
+ * Load provider filters
+ * @param filters
+ */
+Toolbar.prototype.loadProviderFilters = function(
+  filters,
+) {
+  // Does this provider have custom filters?
+  if (!filters || filters.length === 0) {
+    return {};
+  }
+
+  const filterList = {};
+
+  filters.forEach((filter) => {
+    const key = filter.name || filter.label;
+
+    // Decorate the filter
+    const baseFilter = filter;
+
+    baseFilter.value = filter?.value || '';
+
+    // Add translations
+    if (filter.type === 'dropdown') {
+      baseFilter.hideDefault = filter?.hideDefault || true;
+      baseFilter.values = filter.options.map((option) => ({
+        name: toolbarTrans.libraryTypes[option.value] || option.name,
+        type: option.value,
+        disabled: option?.disabled || false,
+      }));
+    }
+
+    // Convert visibility to JSON to be able to add to handlebars
+    if (filter.visibility) {
+      baseFilter.visibilityCondition = JSON.stringify(filter.visibility);
+    }
+
+    filterList[key] = baseFilter;
+  });
+
+  return filterList;
 };
 
 module.exports = Toolbar;

@@ -304,11 +304,11 @@ PropertiesPanel.prototype.save = function(
             },
           );
         } else if (target.type === 'layout') {
-          // Update resolution id
-          app.layout.resolutionId = resolutionId;
-
           // Update layout
           app.layout.updateData(data.data);
+
+          // Update resolution id
+          app.layout.resolutionId = resolutionId;
 
           // Render top bar to update layout changes
           app.topbar.render();
@@ -2533,7 +2533,10 @@ PropertiesPanel.prototype.createEditAction = function(
   // Create action and add to container
   const $newActionContainer =
     $(actionFormActionEditTemplate($.extend({}, actionData, {
-      trans: propertiesPanelTrans.actions,
+      trans: Object.assign(
+        propertiesPanelTrans.actions,
+        propertiesPanelTrans.keyCapture,
+      ),
     })));
 
   // Add action id to container
@@ -2932,6 +2935,13 @@ PropertiesPanel.prototype.createPreviewAction = function(
   if (actionData.widgetId) {
     actionData.widgetName =
       app.getObjectName('drawerWidget', actionData.widgetId);
+  }
+
+  // If it's a key press trigger type
+  // format trigger code to human readable format
+  if (actionData.triggerType === 'keyPress') {
+    actionData.triggerCodeFormatted =
+      formHelpers.formatKeyCodeToReadableFormat(actionData.triggerCode);
   }
 
   // Create action and add to container

@@ -354,6 +354,24 @@ class Schedule implements \JsonSerializable
     public $name;
 
     /**
+     * @SWG\Property(description="The resolutionId of this Fullscreen Scheduled Event")
+     * @var int
+     */
+    public int $resolutionId;
+
+    /**
+     * @SWG\Property(description="The duration of this Fullscreen Scheduled Event")
+     * @var int
+     */
+    public int $layoutDuration;
+
+    /**
+     * @SWG\Property(description="The background color of this Fullscreen Scheduled Event")
+     * @var string
+     */
+    public string $backgroundColor;
+
+    /**
      * @var ScheduleEvent[]
      */
     private $scheduleEvents = [];
@@ -520,7 +538,7 @@ class Schedule implements \JsonSerializable
      * @return bool
      * @throws GeneralException
      */
-    private function inScheduleLookAhead()
+    private function inScheduleLookAhead(): bool
     {
         if ($this->isAlwaysDayPart()) {
             return true;
@@ -533,6 +551,9 @@ class Schedule implements \JsonSerializable
 
         // Dial current date back to the start of the day
         $currentDate->startOfDay();
+
+        // Is the event updated to a past date?
+        $isEventUpdatedToPastDate = ($this->toDt <= $this->getOriginalValue('toDt'));
 
         // Test dates
         if ($this->recurrenceType != '') {
@@ -550,6 +571,12 @@ class Schedule implements \JsonSerializable
             // only test the from date.
             $this->getLog()->debug('Checking look ahead based from date ' . $currentDate->toRssString());
             return ($this->fromDt >= $currentDate->format('U') && $this->fromDt <= $rfLookAhead->format('U'));
+        } else if ($isEventUpdatedToPastDate) {
+            // Check if the event was updated to a past date
+            // We only need to check the toDt
+            $this->getLog()->debug('Checking look ahead based based on previous event details');
+
+            return ($this->getOriginalValue('toDt') >= $currentDate->format('U'));
         } else {
             // Compare the event dates
             $this->getLog()->debug(
@@ -712,6 +739,16 @@ class Schedule implements \JsonSerializable
                 );
             }
 
+            if ($this->isCustomDayPart()) {
+                // validate the dates
+                if ($this->toDt <= $this->fromDt) {
+                    throw new InvalidArgumentException(
+                        __('Can not have an end time earlier than your start time'),
+                        'start/end'
+                    );
+                }
+            }
+
             if ($this->actionType === 'command') {
                 if (!v::intType()->notEmpty()->validate($this->commandId)) {
                     throw new InvalidArgumentException(__('Please select a Command for this event.'), 'commandId');
@@ -744,6 +781,17 @@ class Schedule implements \JsonSerializable
             if (!v::intType()->notEmpty()->validate($this->dataSetId)) {
                 throw new InvalidArgumentException(__('Please select a DataSet for this event.'), 'dataSetId');
             }
+
+            if ($this->isCustomDayPart()) {
+                // validate the dates
+                if ($this->toDt <= $this->fromDt) {
+                    throw new InvalidArgumentException(
+                        __('Can not have an end time earlier than your start time'),
+                        'start/end'
+                    );
+                }
+            }
+
             $this->campaignId = null;
         } else {
             // No event type selected
@@ -900,6 +948,7 @@ class Schedule implements \JsonSerializable
         // Notify
         if ($options['notify']) {
             // Only if the schedule effects the immediate future - i.e. within the RF Look Ahead
+            // Or if the scheduled event was updated to a past date
             if ($this->inScheduleLookAhead()) {
                 $this->getLog()->debug(
                     'Schedule changing is within the schedule look ahead, will notify '
@@ -2077,12 +2126,13 @@ class Schedule implements \JsonSerializable
     }
 
     /**
-     * Get an array of event types for the add/edit form
+     * Get an array of event types
+     * @param array $exclude Event type IDs to exclude
      * @return array
      */
-    public static function getEventTypesForm(): array
+    public static function getEventTypes(array $exclude = []): array
     {
-        return [
+        $eventTypes = [
             ['eventTypeId' => self::$LAYOUT_EVENT, 'eventTypeName' => __('Layout')],
             ['eventTypeId' => self::$COMMAND_EVENT, 'eventTypeName' => __('Command')],
             ['eventTypeId' => self::$OVERLAY_EVENT, 'eventTypeName' => __('Overlay Layout')],
@@ -2091,20 +2141,18 @@ class Schedule implements \JsonSerializable
             ['eventTypeId' => self::$ACTION_EVENT, 'eventTypeName' => __('Action')],
             ['eventTypeId' => self::$MEDIA_EVENT, 'eventTypeName' => __('Video/Image')],
             ['eventTypeId' => self::$PLAYLIST_EVENT, 'eventTypeName' => __('Playlist')],
+            ['eventTypeId' => self::$SYNC_EVENT, 'eventTypeName' => __('Synchronised Event')],
             ['eventTypeId' => self::$DATA_CONNECTOR_EVENT, 'eventTypeName' => __('Data Connector')],
         ];
-    }
 
-    /**
-     * Get an array of event types for the grid
-     * @return array
-     */
-    public static function getEventTypesGrid(): array
-    {
-        $events = self::getEventTypesForm();
-        $events[] = ['eventTypeId' => self::$SYNC_EVENT, 'eventTypeName' => __('Synchronised Event')];
+        if (!empty($exclude)) {
+            $eventTypes = array_filter(
+                $eventTypes,
+                fn($type) => !in_array($type['eventTypeId'], $exclude, true)
+            );
+        }
 
-        return $events;
+        return array_values($eventTypes);
     }
 
     /**

@@ -31,6 +31,7 @@ window.templates = {
     divider: require('./src/templates/forms/inputs/divider.hbs'),
     buttonSwitch: require('./src/templates/forms/inputs/buttonSwitch.hbs'),
     custom: require('./src/templates/forms/inputs/custom.hbs'),
+    keyCapture: require('./src/templates/forms/inputs/keyCapture.hbs'),
     datasetSelector:
       require('./src/templates/forms/inputs/datasetSelector.hbs'),
     menuBoardSelector:
@@ -100,8 +101,6 @@ window.templates = {
   schedule: {
     criteriaFields:
       require('./src/templates/schedule/schedule-criteria-fields.hbs'),
-    fullscreenSchedule:
-      require('./src/templates/schedule/fullscreen-schedule.hbs'),
     reminderEvent:
       require('./src/templates/schedule/reminder-event.hbs'),
   },
@@ -114,6 +113,7 @@ window.templates = {
     year: require('./src/templates/calendar/year.hbs'),
     'year-month': require('./src/templates/calendar/year-month.hbs'),
     agenda: require('./src/templates/calendar/agenda.hbs'),
+    agendaFilter: require('./src/templates/calendar/agenda-filter.hbs'),
     'agenda-layouts': require('./src/templates/calendar/agenda-layouts.hbs'),
     'agenda-displaygroups':
       require('./src/templates/calendar/agenda-display-groups.hbs'),

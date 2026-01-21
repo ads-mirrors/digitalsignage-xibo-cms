@@ -100,6 +100,17 @@ class AnonymousUsageTask implements TaskInterface
                 'name' => '\\Xibo\\Connector\\XiboDashboardConnector'
             ]) ?? 0;
 
+        // Most recent date any user log in happened
+        $timeZone = $this->getConfig()->getSetting('defaultTimezone');
+        $data['dateSinceLastUserLogin'] = $this->getTimestampFromMysqlDateTime(
+            $this->runQuery(
+                'SELECT MAX(`lastAccessed`) AS lastAccessed FROM `user`',
+                [],
+                'lastAccessed'
+            ),
+            $timeZone,
+        );
+
         // Displays
         $data = array_merge($data, $this->displayStats());
         $data['countOfDisplays'] = $this->runQuery(
@@ -188,6 +199,48 @@ class AnonymousUsageTask implements TaskInterface
             $this->runQuery('SELECT COUNT(*) AS countOf FROM `reportschedule`');
         $data['countOfSavedReports'] =
             $this->runQuery('SELECT COUNT(*) AS countOf FROM `saved_report`');
+
+        // Content Freshness
+        $last24Hours = Carbon::now()->subHours(24)->format('Y-m-d H:i:s');
+        $data['countOfLayoutsUpdatedLastTwentyFour'] =
+            $this->runQuery('SELECT COUNT(*) AS countOf FROM `layout` WHERE `modifiedDt` > :recently', [
+                'recently' => $last24Hours,
+            ]);
+        $data['dateSinceLastLayoutUpdate'] = $this->getTimestampFromMysqlDateTime(
+            $this->runQuery(
+                'SELECT MAX(`modifiedDt`) AS modifiedDt FROM `layout`',
+                [],
+                'modifiedDt'
+            ),
+            $timeZone,
+        );
+        $data['countOfPlaylistsUpdatedLastTwentyFour'] =
+            $this->runQuery(
+                'SELECT COUNT(*) AS countOf FROM `playlist` WHERE `regionId` IS NULL AND `modifiedDt` > :recently',
+                [
+                    'recently' => $last24Hours,
+                ],
+            );
+        $data['dateSinceLastPlaylistUpdate'] = $this->getTimestampFromMysqlDateTime(
+            $this->runQuery(
+                'SELECT MAX(`modifiedDt`) AS modifiedDt FROM `playlist` WHERE `regionId` IS NULL',
+                [],
+                'modifiedDt'
+            ),
+            $timeZone,
+        );
+        $data['countOfMediaUpdatedLastTwentyFour'] =
+            $this->runQuery('SELECT COUNT(*) AS countOf FROM `media` WHERE `modifiedDt` > :recently', [
+                'recently' => $last24Hours,
+            ]);
+        $data['dateSinceLastMediaUpdate'] = $this->getTimestampFromMysqlDateTime(
+            $this->runQuery(
+                'SELECT MAX(`modifiedDt`) AS modifiedDt FROM `media`',
+                [],
+                'modifiedDt'
+            ),
+            $timeZone,
+        );
 
         // Widgets
         $data['countOfImageWidgets'] =
@@ -301,5 +354,18 @@ class AnonymousUsageTask implements TaskInterface
             $this->getLogger()->debug('runQuery: error returning specific stat, e: ' . $PDOException->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Get a timestamp converted to UTC
+     * @param $dateTime
+     * @param $timeZone
+     * @return string|null
+     */
+    private function getTimestampFromMysqlDateTime($dateTime, $timeZone): string|null
+    {
+        return $dateTime !== null
+            ? Carbon::parse($dateTime, $timeZone)->setTimezone('UTC')->timestamp
+            : null;
     }
 }

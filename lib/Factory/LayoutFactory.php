@@ -34,12 +34,14 @@ use Xibo\Entity\Region;
 use Xibo\Entity\User;
 use Xibo\Entity\Widget;
 use Xibo\Helper\DateFormatHelper;
+use Xibo\Helper\Environment;
 use Xibo\Service\ConfigServiceInterface;
 use Xibo\Service\MediaServiceInterface;
 use Xibo\Support\Exception\DuplicateEntityException;
 use Xibo\Support\Exception\GeneralException;
 use Xibo\Support\Exception\InvalidArgumentException;
 use Xibo\Support\Exception\NotFoundException;
+use Xibo\Widget\SubPlaylistItem;
 
 /**
  * Class LayoutFactory
@@ -239,7 +241,7 @@ class LayoutFactory extends BaseFactory
         $layout->layout = $name;
         $layout->description = $description;
         $layout->backgroundzIndex = 0;
-        $layout->backgroundColor = '#000';
+        $layout->backgroundColor = '#000000';
         $layout->code = $code;
 
         // Set the owner
@@ -551,30 +553,27 @@ class LayoutFactory extends BaseFactory
     /**
      * @param string $type
      * @param int $id
+     * @param array $properties
      * @return Layout|null
      * @throws NotFoundException
      */
-    public function getLinkedFullScreenLayout(string $type, int $id): ?Layout
+    public function getLinkedFullScreenLayout(string $type, int $id, array $properties = []): ?Layout
     {
-        $layouts = null;
+        $params = [
+            'campaignType' => $type
+        ];
 
         if ($type === 'media') {
-            $layouts = $this->query(
-                null,
-                [
-                    'mediaId' => $id,
-                    'campaignType' => $type
-                ]
-            );
+            $params['mediaId'] = $id;
         } else if ($type === 'playlist') {
-            $layouts = $this->query(
-                null,
-                [
-                    'playlistId' => $id,
-                    'campaignType' => $type
-                ]
-            );
+            $params['playlistId'] = $id;
         }
+
+        if (!empty($properties)) {
+            $params = array_merge($params, $properties);
+        }
+
+        $layouts = $this->query(null, $params);
 
         if (count($layouts) <= 0) {
             return null;
@@ -623,10 +622,6 @@ class LayoutFactory extends BaseFactory
                         ON `playlist`.regionId = `region`.regionId
                     INNER JOIN lkplaylistplaylist
                         ON `lkplaylistplaylist`.parentId = `playlist`.playlistId
-                    INNER JOIN widget
-                        ON `widget`.playlistId = `lkplaylistplaylist`.childId
-                    INNER JOIN lkwidgetmedia
-                        ON `widget`.widgetId = `lkwidgetmedia`.widgetId        
                     INNER JOIN `lkcampaignlayout` lkcl
                             ON lkcl.layoutid = region.layoutid
                             AND lkcl.CampaignID = :campaignId',
@@ -2375,6 +2370,46 @@ class LayoutFactory extends BaseFactory
             $params['status'] = $parsedFilter->getInt('status');
         }
 
+        // Layout Duration
+        if ($parsedFilter->getInt('duration') !== null) {
+            $body .= " AND layout.duration = :duration ";
+            $params['duration'] = $parsedFilter->getInt('duration');
+        }
+
+        // Layout Background Color
+        if ($parsedFilter->getString('backgroundColor') !== null) {
+            $bgConvertedHex = $parsedFilter->getString('backgroundColor');
+
+            // Handle both shorthand and normal hex values
+            if (preg_match('/^#?([0-9a-fA-F]{3})$/', $bgConvertedHex, $matches)) {
+                // Convert shorthand hex to normal hex (i.e. #000 -> #000000)
+                $bgConvertedHex = '#' . preg_replace('/(.)/', '$1$1', $matches[1]);
+            } else {
+                // Convert normal hex to shorthand hex (i.e. #000000 -> #000)
+                $bgConvertedHex = preg_replace(
+                    '/^#?([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3$/',
+                    '#$1$2$3',
+                    $bgConvertedHex
+                );
+            }
+
+            $body .= " AND (layout.backgroundColor = :backgroundColor OR layout.backgroundColor = :bgConvertedHex) ";
+            $params['backgroundColor'] = $parsedFilter->getString('backgroundColor');
+            $params['bgConvertedHex'] = $bgConvertedHex;
+        }
+
+        // Layout Height
+        if ($parsedFilter->getInt('height') !== null) {
+            $body .= " AND layout.height = :height ";
+            $params['height'] = $parsedFilter->getInt('height');
+        }
+
+        // Layout Width
+        if ($parsedFilter->getInt('width') !== null) {
+            $body .= " AND layout.width = :width ";
+            $params['width'] = $parsedFilter->getInt('width');
+        }
+
         // Background Image
         if ($parsedFilter->getInt('backgroundImageId') !== null) {
             $body .= " AND layout.backgroundImageId = :backgroundImageId ";
@@ -2596,7 +2631,10 @@ class LayoutFactory extends BaseFactory
             }
         }
 
-        if ($parsedFilter->getString('campaignType') != '') {
+        // Get the fullscreen media or playlist layout
+        if ($parsedFilter->getInt('isFullScreenCampaign', ['default' => -1]) == 1) {
+            $body .= ' AND campaign.type IN ("media", "playlist") ';
+        } else if ($parsedFilter->getString('campaignType') != '') {
             $body .= ' AND campaign.type = :type ';
             $params['type'] = $parsedFilter->getString('campaignType');
         }
@@ -2784,7 +2822,9 @@ class LayoutFactory extends BaseFactory
 
         /** @var Region[] $allRegions */
         $allRegions = array_merge($draft->regions, $draft->drawers);
-        $draft->copyActions($draft, $layout);
+
+        // Skip the action validation on checkout
+        $draft->copyActions($draft, $layout, false);
 
         // Permissions && Sub-Playlists
         // Layout level permissions are managed on the Campaign entity, so we do not need to worry about that
@@ -3126,6 +3166,197 @@ class LayoutFactory extends BaseFactory
         }
 
         return $module;
+    }
+
+    /**
+     * Creates fullscreen layout from media or playlist
+     * @params $id
+     * @params $resolutionId
+     * @params $backgroundColor
+     * @params $duration
+     * @params $type
+     * @throws InvalidArgumentException
+     * @throws NotFoundException
+     * @throws GeneralException
+     */
+    public function createFullScreenLayout($type, $id, $resolutionId, $backgroundColor, $duration): Layout
+    {
+        $media = null;
+        $playlist = null;
+        $playlistItems = [];
+
+        if ($type === 'media') {
+            $media = $this->mediaFactory->getById($id);
+        } else if ($type === 'playlist') {
+            $playlist = $this->playlistFactory->getById($id);
+            $playlist->load();
+        }
+
+        if (empty($resolutionId)) {
+            if ($type === 'media') {
+                $resolutionId = $this->resolutionFactory->getClosestMatchingResolution(
+                    $media->width,
+                    $media->height
+                )->resolutionId;
+            } else if ($type === 'playlist') {
+                $resolutionId = $this->resolutionFactory->getClosestMatchingResolution(
+                    1920,
+                    1080
+                )->resolutionId;
+            }
+        }
+
+        $module = $this->moduleFactory->getByType($type === 'media' ? $media->mediaType : 'subplaylist');
+
+        // Determine the duration
+        // if we have a duration provided, then use it, otherwise use the duration recorded on the
+        // library item/playlist already
+        $itemDuration = $duration;
+
+        if (empty($itemDuration)) {
+            $itemDuration = ($type === 'media' ? $media->duration : $playlist->duration);
+        }
+
+        // If the library item duration (or provided duration) is 0, then default to the Module Default
+        // Duration as configured in settings.
+        $itemDuration = ($itemDuration == 0) ? $module->defaultDuration : $itemDuration;
+
+        // Do we have an existing layout with the same properties as the current one?
+        $currentLayoutDimension = $this->resolutionFactory->getById($resolutionId);
+
+        if (empty($backgroundColor)) {
+            $backgroundColor = '#000000';
+        }
+
+        $currentLayoutProperties = [
+            'backgroundColor' => $backgroundColor,
+            'height' => $currentLayoutDimension->height,
+            'width' => $currentLayoutDimension->width
+        ];
+
+        if ($type === 'media') {
+            // do we already have a full screen layout with this media?
+            $existingFullscreenLayout = $this->getLinkedFullScreenLayout(
+                'media',
+                $media->mediaId,
+                array_merge($currentLayoutProperties, ['duration' => $itemDuration])
+            );
+        } else if ($type === 'playlist') {
+            // do we already have a full screen layout with this playlist?
+            $existingFullscreenLayout = $this->getLinkedFullScreenLayout(
+                'playlist',
+                $playlist->playlistId,
+                $currentLayoutProperties
+            );
+        }
+
+        if (!empty($existingFullscreenLayout)) {
+            // Return
+            return $existingFullscreenLayout;
+        }
+
+        $layout = $this->createFromResolution(
+            $resolutionId,
+            $this->getUser()->userId,
+            $type . '_' .
+            ($type === 'media' ? $media->name : $playlist->name) .
+            '_' . ($type === 'media' ? $media->mediaId : $playlist->playlistId),
+            'Full Screen Layout created from ' . ($type === 'media' ? $media->name : $playlist->name),
+            '',
+            null,
+            false
+        );
+
+        if (!empty($backgroundColor)) {
+            $layout->backgroundColor = $backgroundColor;
+        }
+
+        $this->addRegion(
+            $layout,
+            $type === 'media' ? 'frame' : 'playlist',
+            $layout->width,
+            $layout->height,
+            0,
+            0
+        );
+
+        $layout->setUnmatchedProperty('type', $type);
+        $layout->autoApplyTransitions = 0;
+        $layout->schemaVersion = Environment::$XLF_VERSION;
+        $layout->folderId = ($type === 'media') ? $media->folderId : $playlist->folderId;
+
+        // Media files have their own validation so we can skip
+        $layout->save(['validate' => false]);
+
+        $draft = $this->checkoutLayout($layout);
+
+        $region = $draft->regions[0];
+
+        // Create a widget
+        $widget = $this->widgetFactory->create(
+            $this->getUser()->userId,
+            $region->getPlaylist()->playlistId,
+            $type === 'media' ? $media->mediaType : 'subplaylist',
+            $itemDuration,
+            $module->schemaVersion
+        );
+
+        if ($type === 'playlist') {
+            // save here, simulate add Widget
+            // next save (with playlist) will edit and save the Widget and dispatch event that manages closure table.
+            $widget->save();
+            $item = new SubPlaylistItem();
+            $item->rowNo = 1;
+            $item->playlistId = $playlist->playlistId;
+            $item->spotFill = 'repeat';
+            $item->spotLength =  '';
+            $item->spots = '';
+
+            $playlistItems[] = $item;
+            $widget->setOptionValue('subPlaylists', 'attrib', json_encode($playlistItems));
+        } else {
+            $widget->useDuration = 1;
+            $widget->assignMedia($media->mediaId);
+        }
+
+        // Calculate the duration
+        $widget->calculateDuration($module);
+
+        // Set loop for media items with custom duration
+        if ($type === 'media' && $media->mediaType === 'video' && $itemDuration > $media->duration) {
+            $widget->setOptionValue('loop', 'attrib', 1);
+            $widget->save();
+        }
+
+        // Assign the widget to the playlist
+        $region->getPlaylist()->assignWidget($widget);
+        // Save the playlist
+        $region->getPlaylist()->save();
+        $region->save();
+
+        // look up the record in the database
+        // as we do not set modifiedDt on the object on save.
+        $draft = $this->getByParentId($layout->layoutId);
+        $draft->publishDraft();
+        $draft->load();
+
+        // We also build the XLF at this point, and if we have a problem we prevent publishing and raise as an
+        // error message
+        $draft->xlfToDisk(['notify' => true, 'exceptionOnError' => true, 'exceptionOnEmptyRegion' => false]);
+
+        // Return
+        return $draft;
+    }
+
+    /**
+     * Get the layout resolutionId
+     * @params $layout
+     * @throws NotFoundException
+     * @throws GeneralException
+     */
+    public function getLayoutResolutionId($layout)
+    {
+        return $this->resolutionFactory->getClosestMatchingResolution($layout->width, $layout->height);
     }
 
     // </editor-fold>

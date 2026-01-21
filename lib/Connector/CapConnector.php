@@ -120,78 +120,86 @@ class CapConnector implements ConnectorInterface, EmergencyAlertInterface
      */
     public function onDataRequest(WidgetDataRequestEvent $event): void
     {
-        if ($event->getDataProvider()->getDataSource() === 'emergency-alert') {
-            $event->stopPropagation();
+        if ($event->getDataProvider()->getDataSource() !== 'emergency-alert') {
+            return;
+        }
 
-            try {
-                // check if CAP URL is present
-                if (empty($event->getDataProvider()->getProperty('emergencyAlertUri'))) {
-                    $this->getLogger()->debug('onDataRequest: Emergency alert not configured.');
-                    $event->getDataProvider()->addError(__('Missing CAP URL'));
-                    return;
-                }
+        $event->stopPropagation();
 
-                // Set cache expiry date to 3 minutes from now
-                $cacheExpire = Carbon::now()->addMinutes(3);
-
-                // Fetch the CAP XML content from the given URL
-                $xmlContent = $this->fetchCapAlertFromUrl($event->getDataProvider(), $cacheExpire);
-
-                if ($xmlContent) {
-                    // Initialize DOMDocument and load the XML content
-                    $this->capXML = new DOMDocument();
-                    $this->capXML->loadXML($xmlContent);
-
-                    // Process and initialize CAP data
-                    $this->processCapData($event->getDataProvider());
-
-                    // Initialize update interval
-                    $updateIntervalMinute = $event->getDataProvider()->getProperty('updateInterval');
-
-                    // Convert the $updateIntervalMinute to seconds
-                    $updateInterval = $updateIntervalMinute * 60;
-
-                    // If we've got data, then set our cache period.
-                    $event->getDataProvider()->setCacheTtl($updateInterval);
-                    $event->getDataProvider()->setIsHandled();
-
-                    $capStatus = $this->getCapXmlData('status');
-                    $category = $this->getCapXmlData('category');
-                } else {
-                    $capStatus = 'No Alerts';
-                    $category = '';
-                }
-
-                // initialize status for schedule criteria push message
-                if ($capStatus == 'Actual') {
-                    $status = self::ACTUAL_ALERT;
-                } elseif ($capStatus == 'No Alerts') {
-                    $status = self::NO_ALERT;
-                } else {
-                    $status = self::TEST_ALERT;
-                }
-
-                $this->getLogger()->debug('Schedule criteria push message: status = ' . $status
-                    . ', category = ' . $category);
-
-                // Set schedule criteria update
-                $action = new ScheduleCriteriaUpdateAction();
-                $action->setCriteriaUpdates([
-                    ['metric' => 'emergency_alert_status', 'value' => $status, 'ttl' => 60],
-                    ['metric' => 'emergency_alert_category', 'value' => $category, 'ttl' => 60]
-                ]);
-
-                // Initialize the display
-                $displayId = $event->getDataProvider()->getDisplayId();
-                $display = $this->displayFactory->getById($displayId);
-
-                // Criteria push message
-                $this->getPlayerActionService()->sendAction($display, $action);
-            } catch (Exception $exception) {
-                $this->getLogger()
-                    ->error('onDataRequest: Failed to get results. e = ' . $exception->getMessage());
-                $event->getDataProvider()->addError(__('Unable to get Common Alerting Protocol (CAP) results.'));
+        try {
+            // check if CAP URL is present
+            if (empty($event->getDataProvider()->getProperty('emergencyAlertUri'))) {
+                $this->getLogger()->debug('onDataRequest: Emergency alert not configured.');
+                $event->getDataProvider()->addError(__('Missing CAP URL'));
+                return;
             }
+
+            // Set cache expiry date to 3 minutes from now
+            $cacheExpire = Carbon::now()->addMinutes(3);
+
+            // Fetch the CAP XML content from the given URL
+            $xmlContent = $this->fetchCapAlertFromUrl($event->getDataProvider(), $cacheExpire);
+
+            if ($xmlContent) {
+                // Initialize DOMDocument and load the XML content
+                $this->capXML = new DOMDocument();
+                $this->capXML->loadXML($xmlContent);
+
+                // Process and initialize CAP data
+                $this->processCapData($event->getDataProvider());
+
+                // Initialize update interval
+                $updateIntervalMinute = $event->getDataProvider()->getProperty('updateInterval');
+
+                // Convert the $updateIntervalMinute to seconds
+                $updateInterval = $updateIntervalMinute * 60;
+
+                // If we've got data, then set our cache period.
+                $event->getDataProvider()->setCacheTtl($updateInterval);
+                $event->getDataProvider()->setIsHandled();
+
+                $capStatus = $this->getCapXmlData('status');
+                $category = $this->getCapXmlData('category');
+            } else {
+                $capStatus = 'No Alerts';
+                $category = '';
+            }
+
+            // initialize status for schedule criteria push message
+            if ($capStatus == 'Actual') {
+                $status = self::ACTUAL_ALERT;
+            } elseif ($capStatus == 'No Alerts') {
+                $status = self::NO_ALERT;
+            } else {
+                $status = self::TEST_ALERT;
+            }
+
+            $this->getLogger()->debug('Schedule criteria push message: status = ' . $status
+                . ', category = ' . $category);
+
+            // Set ttl expiry to 180s since widget sync task runs every 180s and add a bit of buffer
+            $ttl = max($updateInterval ?? 180, 180) + 60;
+
+            // Set schedule criteria update
+            $action = new ScheduleCriteriaUpdateAction();
+
+            // Adjust the QOS value lower than the data update QOS to ensure it arrives first
+            $action->setQos(3);
+            $action->setCriteriaUpdates([
+                ['metric' => 'emergency_alert_status', 'value' => $status, 'ttl' => $ttl],
+                ['metric' => 'emergency_alert_category', 'value' => $category, 'ttl' => $ttl]
+            ]);
+
+            // Initialize the display
+            $displayId = $event->getDataProvider()->getDisplayId();
+            $display = $this->displayFactory->getById($displayId);
+
+            // Criteria push message
+            $this->getPlayerActionService()->sendAction($display, $action);
+        } catch (Exception $exception) {
+            $this->getLogger()
+                ->error('onDataRequest: Failed to get results. e = ' . $exception->getMessage());
+            $event->getDataProvider()->addError(__('Unable to get Common Alerting Protocol (CAP) results.'));
         }
     }
 
@@ -274,35 +282,40 @@ class CapConnector implements ConnectorInterface, EmergencyAlertInterface
             // Retrieve all <area> elements within the current <info> element
             $areaNodes = $this->infoNode->getElementsByTagName('area');
 
-            // Iterate through each <area> element
-            foreach ($areaNodes as $areaNode) {
-                $this->areaNode = $areaNode;
+            if (empty($areaNodes->length)) {
+                // If we don't have <area> elements, then provide CAP without the Area
+                $dataProvider->addItem($cap);
+            } else {
+                // Iterate through each <area> element
+                foreach ($areaNodes as $areaNode) {
+                    $this->areaNode = $areaNode;
 
-                $circle = $this->getAreaData('circle');
-                $polygon = $this->getAreaData('polygon');
-                $cap['areaDesc'] = $this->getAreaData('areaDesc');
+                    $circle = $this->getAreaData('circle');
+                    $polygon = $this->getAreaData('polygon');
+                    $cap['areaDesc'] = $this->getAreaData('areaDesc');
 
-                // Check if the area-specific filter is enabled
-                if ($config['isAreaSpecific']) {
-                    if ($circle || $polygon) {
-                        // Get the current display coordinates
-                        $displayLatitude = $dataProvider->getDisplayLatitude();
-                        $displayLongitude = $dataProvider->getDisplayLongitude();
+                    // Check if the area-specific filter is enabled
+                    if ($config['isAreaSpecific']) {
+                        if ($circle || $polygon) {
+                            // Get the current display coordinates
+                            $displayLatitude = $dataProvider->getDisplayLatitude();
+                            $displayLongitude = $dataProvider->getDisplayLongitude();
 
-                        // Retrieve area coordinates (circle or polygon) from CAP XML
-                        $areaCoordinates = $this->getAreaCoordinates();
+                            // Retrieve area coordinates (circle or polygon) from CAP XML
+                            $areaCoordinates = $this->getAreaCoordinates();
 
-                        // Check if display coordinates matches the CAP alert area
-                        if ($this->isWithinArea($displayLatitude, $displayLongitude, $areaCoordinates)) {
+                            // Check if display coordinates matches the CAP alert area
+                            if ($this->isWithinArea($displayLatitude, $displayLongitude, $areaCoordinates)) {
+                                $dataProvider->addItem($cap);
+                            }
+                        } else {
+                            // Provide CAP data if no coordinate/s is provided
                             $dataProvider->addItem($cap);
                         }
                     } else {
-                        // Provide CAP data if no coordinate/s is provided
+                        // Provide CAP data if area-specific filter is disabled
                         $dataProvider->addItem($cap);
                     }
-                } else {
-                    // Provide CAP data if area-specific filter is disabled
-                    $dataProvider->addItem($cap);
                 }
             }
         }

@@ -66,6 +66,54 @@ class PixabayConnector implements ConnectorInterface
         return 'theme/default/img/connectors/pixabay_square_green.png';
     }
 
+    public function getFilters(): array
+    {
+        return [
+            [
+                'name' => 'name',
+                'type' => 'string',
+                'key' => 'media'
+            ],
+            [
+                'label' => 'type',
+                'type'  => 'dropdown',
+                'options' => [
+                    [
+                        'name' => 'Image',
+                        'value' => 'image'
+                    ],
+                    [
+                        'name' => 'Video',
+                        'value' => 'video'
+                    ]
+                ]
+            ],
+            [
+                'label' => 'orientation',
+                'type'  => 'dropdown',
+                'options' => [
+                    [
+                        'name' => 'All',
+                        'value' => ''
+                    ],
+                    [
+                        'name' => 'Landscape',
+                        'value' => 'landscape'
+                    ],
+                    [
+                        'name' => 'Portrait',
+                        'value' => 'portrait'
+                    ]
+                ],
+                'visibility' => [
+                    'field' => 'type',
+                    'type' => 'eq',
+                    'value' => 'image'
+                ]
+            ]
+        ];
+    }
+
     public function getSettingsFormTwig(): string
     {
         return 'pixabay-form-settings';
@@ -179,6 +227,7 @@ class PixabayConnector implements ConnectorInterface
             $providerDetails->logoUrl = '/theme/default/img/connectors/pixabay_logo.svg';
             $providerDetails->iconUrl = '/theme/default/img/connectors/pixabay_logo_square.svg';
             $providerDetails->backgroundColor = '';
+            $providerDetails->filters = $this->getFilters();
 
             // Process each hit into a search result and add it to the overall results we've been given.
             foreach ($body->hits as $result) {
@@ -268,6 +317,7 @@ class PixabayConnector implements ConnectorInterface
         $providerDetails->iconUrl = '/theme/default/img/connectors/pixabay_logo_square.svg';
         $providerDetails->backgroundColor = '';
         $providerDetails->mediaTypes = ['image', 'video'];
+        $providerDetails->filters = $this->getFilters();
 
         $event->addProvider($providerDetails);
     }

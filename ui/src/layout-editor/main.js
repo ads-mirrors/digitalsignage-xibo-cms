@@ -1126,11 +1126,18 @@ lD.loadFormFromAPI = function(
   // Load form the API
   const linkToAPI = urlsForApi.layout[type];
 
+  const isScheduleForm = (type === 'schedule');
+
   let requestPath = linkToAPI.url;
 
   // Replace ID
   if (id != null) {
     requestPath = requestPath.replace(':id', id);
+  }
+
+  // If schedule, send type
+  if (isScheduleForm) {
+    requestPath += '?fromLayoutEditor=1';
   }
 
   // Create dialog
@@ -1143,12 +1150,15 @@ lD.loadFormFromAPI = function(
   }).done(function(res) {
     if (res.success) {
       // Create buttons
-      const generatedButtons = {
-        cancel: {
+      const generatedButtons = {};
+
+      // Don't add cancel button for schedule form
+      if (!isScheduleForm) {
+        generatedButtons['cancel'] ={
           label: translations.cancel,
           className: 'btn-white',
-        },
-      };
+        };
+      }
 
       // Get buttons from form
       for (const button in res.buttons) {
@@ -1156,6 +1166,7 @@ lD.loadFormFromAPI = function(
           if (res.buttons[button] != 'XiboDialogClose()') {
             let buttonType = 'btn-white';
             let mainButtonAction = false;
+            let customClass = '';
 
             if (
               button === translations.save ||
@@ -1169,11 +1180,20 @@ lD.loadFormFromAPI = function(
 
             const url = res.buttons[button];
 
+            // For schedule add form, add class to save button
+            if (
+              res.data.addForm &&
+              res.callBack === 'setupScheduleForm' &&
+              button === translations.save
+            ) {
+              customClass = ' save-button';
+            }
+
             // Only add button if it's not in the buttons to remove list
             if (buttonsToRemove.indexOf(button) == -1) {
               generatedButtons[button] = {
                 label: button,
-                className: buttonType + ' btn-bb-' + button,
+                className: buttonType + ' btn-bb-' + button + customClass,
                 callback: function(ev) {
                   const $btn = $(ev.currentTarget);
 
@@ -1544,6 +1564,9 @@ lD.deleteObject = function(
 
       // Check layout status
       lD.checkLayoutStatus();
+
+      // Reload layer manager
+      lD.viewer.layerManager.render();
 
       lD.common.hideLoadingScreen();
     }).catch((error) => { // Fail/error
@@ -3363,7 +3386,6 @@ lD.getObjectByTypeAndId = function(type, id, auxId) {
 
     // Verify that the region exists before checking the unique id
     targetObject = lD.layout.regions[id];
-
   } else if (type === 'drawer') {
     targetObject = lD.layout.drawer;
   } else if (type === 'canvas') {

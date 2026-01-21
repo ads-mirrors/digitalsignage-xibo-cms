@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -283,18 +283,11 @@ const Widget = function(id, data, regionId = null, layoutObject = null) {
   };
 
   /**
-   * Get widget calculated duration with the transition out value if exists
+   * Get widget calculated duration
    * @return {number} - Widget duration in seconds
    */
   this.getTotalDuration = function() {
-    let totalDuration = this.getDuration();
-
-    // Extend with transition out duration if exists
-    if (this.transitionDurationOut != undefined) {
-      totalDuration += parseFloat(this.transitionDurationOut) / 1000;
-    }
-
-    return totalDuration;
+    return this.getDuration();
   };
 
   /**
@@ -946,11 +939,10 @@ Widget.prototype.saveElements = function(
             app.viewer.selectObject();
           }
 
-          // Refresh layer manager
-          app.viewer.layerManager.render();
-
-          // Remove canvas from viewer
-          app.viewer.DOMObject.find('.designer-region-canvas').remove();
+          // Reload data and editor
+          app.reloadData(app.layout, {
+            refreshEditor: true,
+          });
         });
     } else if (removeCurrentWidget) {
       // Remove widget
@@ -1391,6 +1383,9 @@ Widget.prototype.getData = function() {
       url: requestPath,
       type: linkToAPI.type,
       dataType: 'json',
+      headers: {
+        'X-PREVIEW-JWT': previewJwt,
+      },
     }).done((data) => {
       // If we don't have data, show sample data
       if (!data.data) {

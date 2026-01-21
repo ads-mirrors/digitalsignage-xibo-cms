@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -24,6 +24,8 @@ namespace Xibo\Controller;
 use Slim\Http\Response as Response;
 use Slim\Http\ServerRequest as Request;
 use Xibo\Factory\LayoutFactory;
+use Xibo\Middleware\TokenAuthMiddleware;
+use Xibo\Service\JwtServiceInterface;
 use Xibo\Support\Exception\AccessDeniedException;
 
 /**
@@ -41,7 +43,7 @@ class Preview extends Base
      * Set common dependencies.
      * @param LayoutFactory $layoutFactory
      */
-    public function __construct($layoutFactory)
+    public function __construct($layoutFactory, private readonly JwtServiceInterface $jwtService)
     {
         $this->layoutFactory = $layoutFactory;
     }
@@ -68,9 +70,14 @@ class Preview extends Base
             $layout = $this->layoutFactory->getById($id);
         }
 
-        if (!$this->getUser()->checkViewable($layout)
-            || !$this->getUser()->featureEnabled(['layout.view', 'playlist.view', 'campaign.view'])
-        ) {
+        /** @var \Lcobucci\JWT\Token $token */
+        $token = $request->getAttribute('authedToken');
+        if (empty($token)) {
+            throw new AccessDeniedException();
+        }
+
+        // Check the token allows access to this layout.
+        if (!$token->isPermittedFor('layout') || !$token->isIdentifiedBy($layout->layoutId)) {
             throw new AccessDeniedException();
         }
 
@@ -83,15 +90,27 @@ class Preview extends Base
         $this->getState()->setData([
             'layout' => $layout,
             'previewOptions' => [
-                'getXlfUrl' => $this->urlFor($request, 'layout.getXlf', ['id' => $layout->layoutId]),
+                'xlfUrl' => $this->urlFor($request, 'layout.getXlf', ['id' => $layout->layoutId]),
                 'getResourceUrl' => $this->urlFor($request, 'module.getResource', [
-                    'regionId' => ':regionId', 'id' => ':id'
+                    'regionId' => ':regionId',
+                    'id' => ':id',
                 ]),
-                'libraryDownloadUrl' => $this->urlFor($request, 'library.download', ['id' => ':id']),
-                'layoutBackgroundDownloadUrl' => $this->urlFor($request, 'layout.download.background', ['id' => ':id']),
+                'layoutBackgroundDownloadUrl' => TokenAuthMiddleware::sign(
+                    $request,
+                    '/preview/layout/background/' . $layout->layoutId,
+                    time() + 3600,
+                    $this->getConfig()->getApiKeyDetails()['encryptionKey'],
+                ),
                 'loaderUrl' => $this->getConfig()->uri('img/loader.gif'),
-                'layoutPreviewUrl' => $this->urlFor($request, 'layout.preview', ['id' => '[layoutCode]'])
-            ]
+                'layoutPreviewUrl' => $this->urlFor($request, 'layout.preview', ['id' => '[layoutCode]']),
+            ],
+            'previewJwt' => $this->jwtService->generateJwt(
+                'Preview',
+                'layout',
+                $layout->layoutId,
+                '/preview/layout/preview/' . $layout->layoutId,
+                3600,
+            )->toString(),
         ]);
 
         return $this->render($request, $response);
@@ -113,7 +132,15 @@ class Preview extends Base
     {
         $layout = $this->layoutFactory->concurrentRequestLock($this->layoutFactory->getById($id));
         try {
-            if (!$this->getUser()->checkViewable($layout)) {
+            /** @var \Lcobucci\JWT\Token $token */
+            $token = $request->getAttribute('authedToken');
+            if (!$this->getUser()->checkViewable($layout) && empty($token)) {
+                throw new AccessDeniedException();
+            }
+
+            if (!empty($token)
+                && (!$token->isPermittedFor('layout') || !$token->isIdentifiedBy($layout->layoutId))
+            ) {
                 throw new AccessDeniedException();
             }
 

@@ -8717,6 +8717,7 @@
                     "schedule"
                 ],
                 "summary": "Generates the calendar that we draw events on",
+                "description": "\u26a0\ufe0f This endpoint is deprecated and will be removed in v5.0.",
                 "operationId": "scheduleCalendarData",
                 "parameters": [
                     {
@@ -8754,7 +8755,8 @@
                             }
                         }
                     }
-                }
+                },
+                "deprecated": true
             }
         },
         "/schedule/{displayGroupId}/events": {
@@ -8773,10 +8775,30 @@
                         "type": "integer"
                     },
                     {
+                        "name": "singlePointInTime",
+                        "in": "query",
+                        "required": false,
+                        "type": "integer"
+                    },
+                    {
                         "name": "date",
                         "in": "query",
                         "description": "Date in Y-m-d H:i:s",
-                        "required": true,
+                        "required": false,
+                        "type": "string"
+                    },
+                    {
+                        "name": "startDate",
+                        "in": "query",
+                        "description": "Date in Y-m-d H:i:s",
+                        "required": false,
+                        "type": "string"
+                    },
+                    {
+                        "name": "endDate",
+                        "in": "query",
+                        "description": "Date in Y-m-d H:i:s",
+                        "required": false,
                         "type": "string"
                     }
                 ],
@@ -8885,7 +8907,7 @@
                     {
                         "name": "fullScreenCampaignId",
                         "in": "formData",
-                        "description": "For Media or Playlist eventyType. The Layout specific Campaign ID to use for this Event.\r\n     * This needs to be the Layout created with layout/fullscreen function",
+                        "description": "For Media or Playlist event Type. The Layout specific Campaign ID to use for this Event.\r\n     * This needs to be the Layout created with layout/fullscreen function",
                         "required": false,
                         "type": "integer"
                     },
@@ -8893,6 +8915,13 @@
                         "name": "commandId",
                         "in": "formData",
                         "description": "The Command ID to use for this Event.",
+                        "required": false,
+                        "type": "integer"
+                    },
+                    {
+                        "name": "mediaId",
+                        "in": "formData",
+                        "description": "The Media ID to use for this Event.",
                         "required": false,
                         "type": "integer"
                     },
@@ -9136,6 +9165,13 @@
                         "name": "commandId",
                         "in": "formData",
                         "description": "The Command ID to use for this Event.",
+                        "required": false,
+                        "type": "integer"
+                    },
+                    {
+                        "name": "mediaId",
+                        "in": "formData",
+                        "description": "The Media ID to use for this Event.",
                         "required": false,
                         "type": "integer"
                     },

@@ -795,6 +795,7 @@ if(!String.prototype.formatNum) {
 					layoutId: event.layoutId,
 					layoutName: layout.layout,
 					layoutStatus: layout.status,
+					previewToken: layout.previewJwt,
 					eventFromDt: moment(event.fromDt, "X").tz ? moment(event.fromDt, "X").tz(timezone).format(jsDateFormat) : moment(event.fromDt, "X").format(jsDateFormat),
 					eventToDt: moment(event.toDt, "X").tz ? moment(event.toDt, "X").tz(timezone).format(jsDateFormat) : moment(event.toDt, "X").format(jsDateFormat),
 					eventDayPartId: event.dayPartId,
@@ -1255,6 +1256,7 @@ if(!String.prototype.formatNum) {
                 var data = {
                     eventStart: eventStart,
                     eventEnd: eventEnd,
+									 	isRecurringInstance: 1,
                 };
                 XiboFormRender($(this), data);
             } else {
@@ -1350,7 +1352,7 @@ if(!String.prototype.formatNum) {
 			.on('click', function(event) {
 				self.options.day = $('[data-cal-date]', this).data('cal-date');
 				updateDatePicker($('#dateInput'), self.options.day, jsDateOnlyFormat);
-				if($('.events-list', this).length == 0) {
+				if($('.events-list', this).length == 0 || $(event.target).is('.cal-month-day-number')) {
 					return;
 				}
 				if($(this).children('[data-cal-date]').text() == self.activecell) {
@@ -1434,6 +1436,8 @@ if(!String.prototype.formatNum) {
 				$('div.cal-cell1').removeClass('day-highlight dh-' + $(this).data('event-class'));
 			});
 			self._update_modal();
+
+			self.context.trigger('calendar.eventListReady', self.options.day);
 		}, 400);
 	}
 

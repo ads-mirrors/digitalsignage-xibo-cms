@@ -42,6 +42,7 @@ use Xibo\Factory\ScheduleReminderFactory;
 use Xibo\Factory\SyncGroupFactory;
 use Xibo\Helper\DateFormatHelper;
 use Xibo\Helper\Session;
+use Xibo\Service\JwtServiceInterface;
 use Xibo\Support\Exception\AccessDeniedException;
 use Xibo\Support\Exception\ControllerNotImplemented;
 use Xibo\Support\Exception\GeneralException;
@@ -97,6 +98,7 @@ class Schedule extends Base
 
     /** @var  DayPartFactory */
     private $dayPartFactory;
+
     private SyncGroupFactory $syncGroupFactory;
 
     /**
@@ -125,7 +127,8 @@ class Schedule extends Base
         $scheduleReminderFactory,
         $scheduleExclusionFactory,
         SyncGroupFactory $syncGroupFactory,
-        private readonly ScheduleCriteriaFactory $scheduleCriteriaFactory
+        private readonly ScheduleCriteriaFactory $scheduleCriteriaFactory,
+        private readonly JwtServiceInterface $jwtService,
     ) {
         $this->session = $session;
         $this->scheduleFactory = $scheduleFactory;
@@ -156,9 +159,9 @@ class Schedule extends Base
         $data = [
             'defaultLat' => $defaultLat,
             'defaultLong' => $defaultLong,
-            'eventTypes' => \Xibo\Entity\Schedule::getEventTypesGrid(),
+            'eventTypes' => \Xibo\Entity\Schedule::getEventTypes(),
         ];
-        
+
         // Render the Theme and output
         $this->getState()->template = 'schedule-page';
         $this->getState()->setData($data);
@@ -168,11 +171,13 @@ class Schedule extends Base
 
     /**
      * Generates the calendar that we draw events on
-     *
+     * @deprecated - Deprecated API: This endpoint will be removed in v5.0
      * @SWG\Get(
      *  path="/schedule/data/events",
      *  operationId="scheduleCalendarData",
+     *  description="⚠️ This endpoint is deprecated and will be removed in v5.0.",
      *  tags={"schedule"},
+     *  deprecated=true,
      *  @SWG\Parameter(
      *      name="displayGroupIds",
      *      description="The DisplayGroupIds to return the schedule for. [-1] for All.",
@@ -214,7 +219,14 @@ class Schedule extends Base
      */
     public function eventData(Request $request, Response $response)
     {
-        $response = $response->withHeader('Content-Type', 'application/json');
+        $response = $response
+            ->withHeader(
+                'Warning',
+                '299 - "Deprecated API: /schedule/data/events will be removed in v5.0"'
+            );
+
+        $this->getLog()->error('Deprecated API called: /schedule/data/events');
+
         $this->setNoOutput();
         $sanitizedParams = $this->getSanitizer($request->getParams());
 
@@ -355,7 +367,7 @@ class Schedule extends Base
             }
 
             // Event URL
-            $editUrlWeb = ($this->isSyncEvent($row->eventTypeId)) ? 'schedule.edit.sync.form' : 'schedule.edit.form';
+            $editUrlWeb = 'schedule.edit.form';
             $editUrl = ($this->isApi($request)) ? 'schedule.edit' : $editUrlWeb;
             $url = ($editable) ? $this->urlFor($request, $editUrl, ['id' => $row->eventId]) : '#';
 
@@ -461,9 +473,29 @@ class Schedule extends Base
      *      required=true
      *  ),
      *  @SWG\Parameter(
+     *      name="singlePointInTime",
+     *      in="query",
+     *      required=false,
+     *      type="integer",
+     *  ),
+     *  @SWG\Parameter(
      *      name="date",
      *      in="query",
-     *      required=true,
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="startDate",
+     *      in="query",
+     *      required=false,
+     *      type="string",
+     *      description="Date in Y-m-d H:i:s"
+     *  ),
+     *  @SWG\Parameter(
+     *      name="endDate",
+     *      in="query",
+     *      required=false,
      *      type="string",
      *      description="Date in Y-m-d H:i:s"
      *  ),
@@ -485,15 +517,24 @@ class Schedule extends Base
         // Setting for whether we show Layouts with out permissions
         $showLayoutName = ($this->getConfig()->getSetting('SCHEDULE_SHOW_LAYOUT_NAME') == 1);
 
-        $date = $sanitizedParams->getDate('date');
+        $singlePointInTime = $sanitizedParams->getInt('singlePointInTime');
+        if ($singlePointInTime == 1) {
+            $startDate = $sanitizedParams->getDate('date');
+            $endDate = $sanitizedParams->getDate('date');
+        } else {
+            $startDate = $sanitizedParams->getDate('startDate');
+            $endDate = $sanitizedParams->getDate('endDate');
+        }
 
         // Reset the seconds
-        $date->second(0);
+        $startDate->second(0);
+        $endDate->second(0);
 
         $this->getLog()->debug(
             sprintf(
-                'Generating eventList for DisplayGroupId ' . $id . ' on date '
-                . $date->format(DateFormatHelper::getSystemFormat())
+                'Generating eventList for DisplayGroupId ' . $id . ' from date '
+                . $startDate->format(DateFormatHelper::getSystemFormat()) . ' to '
+                . $endDate->format(DateFormatHelper::getSystemFormat())
             )
         );
 
@@ -519,7 +560,12 @@ class Schedule extends Base
         }
 
         // Get list of events
-        $scheduleForXmds = $this->scheduleFactory->getForXmds(($display === null) ? null : $display->displayId, $date, $date, $options);
+        $scheduleForXmds = $this->scheduleFactory->getForXmds(
+            ($display === null) ? null : $display->displayId,
+            $startDate,
+            $endDate,
+            $options
+        );
 
         $this->getLog()->debug(count($scheduleForXmds) . ' events returned for displaygroup and date');
 
@@ -541,7 +587,7 @@ class Schedule extends Base
 
             // Get scheduled events based on recurrence
             try {
-                $scheduleEvents = $schedule->getEvents($date, $date);
+                $scheduleEvents = $schedule->getEvents($startDate, $endDate);
             } catch (GeneralException $e) {
                 $this->getLog()->error('Unable to getEvents for ' . $schedule->eventId);
                 continue;
@@ -551,9 +597,7 @@ class Schedule extends Base
             if (count($scheduleEvents) > 0) {
                 // Add the link to the schedule
                 if (!$this->isApi($request)) {
-                    $route = $event['eventTypeId'] == \Xibo\Entity\Schedule::$SYNC_EVENT
-                        ? 'schedule.edit.sync.form'
-                        : 'schedule.edit.form';
+                    $route = 'schedule.edit.form';
                     $schedule->setUnmatchedProperty(
                         'link',
                         $this->urlFor($request, $route, ['id' => $schedule->eventId])
@@ -572,6 +616,20 @@ class Schedule extends Base
                 if ($layoutId != 0 && !array_key_exists($layoutId, $layouts)) {
                     // Look up the layout details
                     $layout = $this->layoutFactory->getById($layoutId);
+
+                    // Add preview token to layout
+                    $jwt = $this->jwtService->generateJwt(
+                        'Preview',
+                        'layout',
+                        $layout->layoutId,
+                        '/preview/layout/preview/' . $layout->layoutId,
+                        3600,
+                    )->toString();
+
+                    $layout->setUnmatchedProperty(
+                        'previewJwt',
+                        $jwt
+                    );
 
                     // Add the link to the layout
                     if (!$this->isApi($request)) {
@@ -702,7 +760,7 @@ class Schedule extends Base
                     $branch->getUnmatchedProperty('depth') . '-' .
                     $branch->getUnmatchedProperty('level')
                 );
-                
+
                 if ($branch->getUnmatchedProperty('depth') < 0 &&
                     $branch->displayGroupId != $eventDisplayGroup->displayGroupId
                 ) {
@@ -771,6 +829,8 @@ class Schedule extends Base
      */
     public function addForm(Request $request, Response $response, ?string $from, ?int $id): Response|ResponseInterface
     {
+        $sanitizedParams = $this->getSanitizer($request->getParams());
+
         // get the default longitude and latitude from CMS options
         $defaultLat = (float)$this->getConfig()->getSetting('DEFAULT_LAT');
         $defaultLong = (float)$this->getConfig()->getSetting('DEFAULT_LONG');
@@ -788,8 +848,8 @@ class Schedule extends Base
             'reminders' => [],
             'defaultLat' => $defaultLat,
             'defaultLong' => $defaultLong,
-            'eventTypes' => \Xibo\Entity\Schedule::getEventTypesForm(),
-            'isScheduleNow' => false,
+            'eventTypes' => \Xibo\Entity\Schedule::getEventTypes(),
+            'addForm' => true,
             'relativeTime' => 0,
             'setDisplaysFromFilter' => true,
             'scheduleCriteria' => $criteria,
@@ -799,7 +859,9 @@ class Schedule extends Base
 
         if (!empty($from) && !empty($id)) {
             $formNowData = [
-                'eventTypeId' => $this->getEventTypeId($from),
+                'event' => [
+                    'eventTypeId' => $this->getEventTypeId($from),
+                ],
                 'campaign' => (
                     ($from == 'Campaign' || $from == 'Layout')
                     ? $this->campaignFactory->getById($id)
@@ -809,8 +871,16 @@ class Schedule extends Base
                 'displayGroupIds' => (($from == 'DisplayGroup') ? [$id] : [0]),
                 'mediaId' => (($from === 'Library') ? $id : null),
                 'playlistId' => (($from === 'Playlist') ? $id : null),
-                'readonlySelect' => !($from == 'DisplayGroup'),
-                'isScheduleNow' => true,
+                // Lock for layout editor only
+                'readonlySelect' => ($from == 'Layout' && $sanitizedParams->getString('fromLayoutEditor') === '1'),
+                // Hide event type, except for Display Groups
+                'hideEventType' => !($from == 'DisplayGroup'),
+                // Skip first step, except for Display Groups
+                'skipFirstStep' => !($from == 'DisplayGroup'),
+                // If coming from display page, don't show syncEvent type
+                'eventTypes' => \Xibo\Entity\Schedule::getEventTypes((($from === 'DisplayGroup') ? [9] : [])),
+                'addForm' => true,
+                'fromCampaign' => ($from == 'Campaign'),
                 'relativeTime' => 1,
                 'setDisplaysFromFilter' => false,
             ];
@@ -818,7 +888,7 @@ class Schedule extends Base
 
         $formData = array_merge($addFormData, $formNowData);
 
-        $this->getState()->template = 'schedule-form-add';
+        $this->getState()->template = 'schedule-form-edit';
         $this->getState()->setData($formData);
 
         return $this->render($request, $response);
@@ -874,7 +944,7 @@ class Schedule extends Base
      *  @SWG\Parameter(
      *      name="fullScreenCampaignId",
      *      in="formData",
-     *      description="For Media or Playlist eventyType. The Layout specific Campaign ID to use for this Event.
+     *      description="For Media or Playlist event Type. The Layout specific Campaign ID to use for this Event.
      * This needs to be the Layout created with layout/fullscreen function",
      *      type="integer",
      *      required=false
@@ -883,6 +953,13 @@ class Schedule extends Base
      *      name="commandId",
      *      in="formData",
      *      description="The Command ID to use for this Event.",
+     *      type="integer",
+     *      required=false
+     *  ),
+     *  @SWG\Parameter(
+     *      name="mediaId",
+     *      in="formData",
+     *      description="The Media ID to use for this Event.",
      *      type="integer",
      *      required=false
      *  ),
@@ -1072,8 +1149,8 @@ class Schedule extends Base
         $schedule->userId = $this->getUser()->userId;
         $schedule->eventTypeId = $sanitizedParams->getInt('eventTypeId');
         $schedule->campaignId = $this->isFullScreenSchedule($schedule->eventTypeId)
-                ? $sanitizedParams->getInt('fullScreenCampaignId')
-                : $sanitizedParams->getInt('campaignId');
+            ? $sanitizedParams->getInt('fullScreenCampaignId')
+            : $sanitizedParams->getInt('campaignId');
         $schedule->commandId = $sanitizedParams->getInt('commandId');
         $schedule->displayOrder = $sanitizedParams->getInt('displayOrder', ['default' => 0]);
         $schedule->isPriority = $sanitizedParams->getInt('isPriority', ['default' => 0]);
@@ -1125,6 +1202,29 @@ class Schedule extends Base
                 }
             ]);
             $schedule->dataSetParams = $sanitizedParams->getString('dataSetParams');
+        }
+
+        // Create fullscreen layout for media/playlist events
+        if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
+            $type = $schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT ? 'media' : 'playlist';
+            $id = ($type === 'media') ? $sanitizedParams->getInt('mediaId') : $sanitizedParams->getInt('playlistId');
+
+            if (!$id) {
+                throw new InvalidArgumentException(
+                    sprintf('%sId is required when scheduling %s events.', ucfirst($type), $type)
+                );
+            }
+
+            $fsLayout = $this->layoutFactory->createFullScreenLayout(
+                $type,
+                $id,
+                $sanitizedParams->getInt('resolutionId'),
+                $sanitizedParams->getString('backgroundColor'),
+                $sanitizedParams->getInt('layoutDuration'),
+            );
+
+            $schedule->campaignId = $this->layoutFactory->getCampaignIdFromLayoutHistory($fsLayout->layoutId);
+            $schedule->parentCampaignId = $schedule->campaignId;
         }
 
         // API request can provide an array of coordinates or valid GeoJSON, handle both cases here.
@@ -1332,6 +1432,8 @@ class Schedule extends Base
         $eventStart = $sanitizedParams->getInt('eventStart', ['default' => 1000]) / 1000;
         $eventEnd = $sanitizedParams->getInt('eventEnd', ['default' => 1000]) / 1000;
 
+        $showRecurringInstance = $sanitizedParams->getInt('isRecurringInstance', ['default' => 0]) === 1;
+
         $schedule = $this->scheduleFactory->getById($id);
         $schedule->load();
 
@@ -1376,7 +1478,7 @@ class Schedule extends Base
 
         if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
             $schedule->setUnmatchedProperty('fullScreenCampaignId', $schedule->campaignId);
-            
+
             if ($schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT) {
                 $schedule->setUnmatchedProperty(
                     'mediaId',
@@ -1388,6 +1490,16 @@ class Schedule extends Base
                     $this->layoutFactory->getLinkedFullScreenPlaylistId($schedule->campaignId)
                 );
             }
+
+            // Get the associated fullscreen layout
+            $fsLayout = $this->layoutFactory->getById(
+                $this->campaignFactory->getLinkedLayouts($schedule->campaignId)[0]->layoutId
+            );
+
+            // Set the layout properties
+            $schedule->backgroundColor = $fsLayout->backgroundColor;
+            $schedule->layoutDuration = $fsLayout->duration;
+            $schedule->resolutionId = $this->layoutFactory->getLayoutResolutionId($fsLayout)->resolutionId;
         }
 
         $this->getState()->template = 'schedule-form-edit';
@@ -1399,13 +1511,15 @@ class Schedule extends Base
             'displayGroupIds' => array_map(function ($element) {
                 return $element->displayGroupId;
             }, $schedule->displayGroups),
+            'addForm' => false,
             'reminders' => $scheduleReminders,
             'defaultLat' => $defaultLat,
             'defaultLong' => $defaultLong,
             'recurringEvent' => $schedule->recurrenceType != '',
+            'showRecurringInstance' => $showRecurringInstance && $schedule->recurrenceType,
             'eventStart' => $eventStart,
             'eventEnd' => $eventEnd,
-            'eventTypes' => \Xibo\Entity\Schedule::getEventTypesForm(),
+            'eventTypes' => \Xibo\Entity\Schedule::getEventTypes(),
             'scheduleCriteria' => $criteria,
             'criteriaDefaultCondition' => $criteriaDefaultCondition
         ]);
@@ -1547,6 +1661,13 @@ class Schedule extends Base
      *      name="commandId",
      *      in="formData",
      *      description="The Command ID to use for this Event.",
+     *      type="integer",
+     *      required=false
+     *  ),
+     *  @SWG\Parameter(
+     *      name="mediaId",
+     *      in="formData",
+     *      description="The Media ID to use for this Event.",
      *      type="integer",
      *      required=false
      *  ),
@@ -1715,6 +1836,8 @@ class Schedule extends Base
         $embed = ($sanitizedParams->getString('embed') != null) ? explode(',', $sanitizedParams->getString('embed')) : [];
 
         $schedule = $this->scheduleFactory->getById($id);
+        $oldSchedule = clone $schedule;
+
         $schedule->load([
             'loadScheduleReminders' => in_array('scheduleReminders', $embed),
         ]);
@@ -1727,7 +1850,6 @@ class Schedule extends Base
         $schedule->campaignId = $this->isFullScreenSchedule($schedule->eventTypeId)
             ? $sanitizedParams->getInt('fullScreenCampaignId')
             : $sanitizedParams->getInt('campaignId');
-
         // displayOrder and isPriority: if present but empty (""): set to 0
         // if missing from form: keep existing value (fallback to 0 if unset)
         $schedule->displayOrder = $sanitizedParams->hasParam('displayOrder')
@@ -1752,6 +1874,7 @@ class Schedule extends Base
         $schedule->displayGroups = [];
         $schedule->isGeoAware = $sanitizedParams->getCheckbox('isGeoAware');
         $schedule->maxPlaysPerHour = $sanitizedParams->getInt('maxPlaysPerHour', ['default' => 0]);
+        $schedule->syncGroupId = $sanitizedParams->getInt('syncGroupId');
         $schedule->name = $sanitizedParams->getString('name');
         $schedule->modifiedBy = $this->getUser()->getId();
 
@@ -1836,6 +1959,30 @@ class Schedule extends Base
                 }
             ]);
             $schedule->dataSetParams = $sanitizedParams->getString('dataSetParams');
+        }
+
+        // Get the campaignId for media/playlist events
+        if ($this->isFullScreenSchedule($schedule->eventTypeId)) {
+            $type = $schedule->eventTypeId === \Xibo\Entity\Schedule::$MEDIA_EVENT ? 'media' : 'playlist';
+            $id = ($type === 'media') ? $sanitizedParams->getInt('mediaId') : $sanitizedParams->getInt('playlistId');
+
+            if (!$id) {
+                throw new InvalidArgumentException(
+                    sprintf('%sId is required when scheduling %s events.', ucfirst($type), $type)
+                );
+            }
+
+            // Create a full screen layout for this event
+            $fsLayout = $this->layoutFactory->createFullScreenLayout(
+                $type,
+                $id,
+                $sanitizedParams->getInt('resolutionId'),
+                $sanitizedParams->getString('backgroundColor'),
+                $sanitizedParams->getInt('layoutDuration'),
+            );
+
+            $schedule->campaignId = $this->layoutFactory->getCampaignIdFromLayoutHistory($fsLayout->layoutId);
+            $schedule->parentCampaignId = $schedule->campaignId;
         }
 
         // API request can provide an array of coordinates or valid GeoJSON, handle both cases here.
@@ -2339,7 +2486,7 @@ class Schedule extends Base
                 $displayGroupList = '';
             }
 
-            $eventTypes = \Xibo\Entity\Schedule::getEventTypesGrid();
+            $eventTypes = \Xibo\Entity\Schedule::getEventTypes();
             foreach ($eventTypes as $eventType) {
                 if ($eventType['eventTypeId'] === $event->eventTypeId) {
                     $event->setUnmatchedProperty('eventTypeName', $eventType['eventTypeName']);
@@ -2348,7 +2495,7 @@ class Schedule extends Base
 
             $event->setUnmatchedProperty('displayGroupList', $displayGroupList);
             $event->setUnmatchedProperty('recurringEvent', !empty($event->recurrenceType));
-            
+
             if ($this->isSyncEvent($event->eventTypeId)) {
                 $event->setUnmatchedProperty(
                     'displayGroupList',
@@ -2426,6 +2573,11 @@ class Schedule extends Base
                         !empty($repeatsUntil) ? ' until ' . $repeatsUntil : ''
                     ))
                 );
+
+                $event->setUnmatchedProperty(
+                    'scheduleExclusions',
+                    $this->scheduleExclusionFactory->query(null, ['eventId' => $event->eventId])
+                );
             } else {
                 $event->setUnmatchedProperty('recurringEventDescription', '');
             }
@@ -2462,9 +2614,7 @@ class Schedule extends Base
                     'id' => 'schedule_button_edit',
                     'url' => $this->urlFor(
                         $request,
-                        ($this->isSyncEvent($event->eventTypeId))
-                            ? 'schedule.edit.sync.form'
-                            : 'schedule.edit.form',
+                        'schedule.edit.form',
                         ['id' => $event->eventId]
                     ),
                     'dataAttributes' => [
@@ -2657,95 +2807,5 @@ class Schedule extends Base
     private function isSyncEvent($eventTypeId): int
     {
         return ($eventTypeId === \Xibo\Entity\Schedule::$SYNC_EVENT) ? 1 : 0;
-    }
-
-    /**
-     * @param Request $request
-     * @param Response $response
-     * @return Response|ResponseInterface
-     * @throws ControllerNotImplemented
-     * @throws GeneralException
-     * @throws NotFoundException
-     */
-    public function syncForm(Request $request, Response $response): Response|ResponseInterface
-    {
-        // get the default longitude and latitude from CMS options
-        $defaultLat = (float)$this->getConfig()->getSetting('DEFAULT_LAT');
-        $defaultLong = (float)$this->getConfig()->getSetting('DEFAULT_LONG');
-
-        $this->getState()->template = 'schedule-form-sync-add';
-        $this->getState()->setData([
-            'eventTypeId' => \Xibo\Entity\Schedule::$SYNC_EVENT,
-            'dayParts' => $this->dayPartFactory->allWithSystem(['isRetired' => 0]),
-            'defaultLat' => $defaultLat,
-            'defaultLong' => $defaultLong,
-            'reminders' => [],
-        ]);
-
-        return $this->render($request, $response);
-    }
-
-    /**
-     * @param Request $request
-     * @param Response $response
-     * @param $id
-     * @return Response|ResponseInterface
-     * @throws AccessDeniedException
-     * @throws ControllerNotImplemented
-     * @throws GeneralException
-     * @throws InvalidArgumentException
-     * @throws NotFoundException
-     */
-    public function syncEditForm(Request $request, Response $response, $id): Response|ResponseInterface
-    {
-        $sanitizedParams = $this->getSanitizer($request->getParams());
-        // Recurring event start/end
-        $eventStart = $sanitizedParams->getInt('eventStart', ['default' => 1000]) / 1000;
-        $eventEnd = $sanitizedParams->getInt('eventEnd', ['default' => 1000]) / 1000;
-
-        $schedule = $this->scheduleFactory->getById($id);
-        $schedule->load();
-
-        if (!$this->isEventEditable($schedule)) {
-            throw new AccessDeniedException();
-        }
-
-        // Fix the event dates for display
-        if ($schedule->isAlwaysDayPart()) {
-            $schedule->fromDt = '';
-            $schedule->toDt = '';
-        } else {
-            $schedule->fromDt =
-                Carbon::createFromTimestamp($schedule->fromDt)->format(DateFormatHelper::getSystemFormat());
-            $schedule->toDt =
-                Carbon::createFromTimestamp($schedule->toDt)->format(DateFormatHelper::getSystemFormat());
-        }
-
-        if ($schedule->recurrenceRange != null) {
-            $schedule->recurrenceRange =
-                Carbon::createFromTimestamp($schedule->recurrenceRange)->format(DateFormatHelper::getSystemFormat());
-        }
-
-        // Get all reminders
-        $scheduleReminders = $this->scheduleReminderFactory->query(null, ['eventId' => $id]);
-
-        // get the default longitude and latitude from CMS options
-        $defaultLat = (float)$this->getConfig()->getSetting('DEFAULT_LAT');
-        $defaultLong = (float)$this->getConfig()->getSetting('DEFAULT_LONG');
-
-        $this->getState()->template = 'schedule-form-sync-edit';
-        $this->getState()->setData([
-            'eventTypeId' => \Xibo\Entity\Schedule::$SYNC_EVENT,
-            'event' => $schedule,
-            'dayParts' => $this->dayPartFactory->allWithSystem(['isRetired' => 0]),
-            'defaultLat' => $defaultLat,
-            'defaultLong' => $defaultLong,
-            'eventStart' => $eventStart,
-            'eventEnd' => $eventEnd,
-            'recurringEvent' => $schedule->recurrenceType != '',
-            'reminders' => $scheduleReminders,
-        ]);
-
-        return $this->render($request, $response);
     }
 }

@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -156,26 +156,37 @@ class DisplayNotifyService implements DisplayNotifyServiceInterface
         $displayIdsRequiringActions = array_values(array_unique($this->displayIdsRequiringActions, SORT_NUMERIC));
         $qmarks = str_repeat('?,', count($displayIdsRequiringActions) - 1) . '?';
         $displays = $this->store->select(
-            'SELECT displayId, xmrChannel, xmrPubKey, display, client_type AS clientType
+            'SELECT displayId, xmrChannel, xmrPubKey, display, client_type AS clientType, `client_code`
               FROM `display`
              WHERE displayId IN (' . $qmarks . ')',
             $displayIdsRequiringActions
         );
 
-        foreach ($displays as $display) {
-            $stdObj = new \stdClass();
-            $stdObj->displayId = $display['displayId'];
-            $stdObj->xmrChannel = $display['xmrChannel'];
-            $stdObj->xmrPubKey = $display['xmrPubKey'];
-            $stdObj->display = $display['display'];
-            $stdObj->clientType = $display['clientType'];
+        foreach ($displays as $row) {
+            // TOOD: this should be improved
+            $display = new Display(
+                $this->store,
+                $this->log,
+                null,
+                $this->config,
+                null,
+                null,
+                null,
+                null,
+            );
+            $display->displayId = intval($row['displayId']);
+            $display->xmrChannel = $row['xmrChannel'];
+            $display->xmrPubKey = $row['xmrPubKey'];
+            $display->display = $row['display'];
+            $display->clientType = $row['clientType'];
+            $display->clientCode = intval($row['client_code']);
 
             try {
-                $this->playerActionService->sendAction($stdObj, new CollectNowAction());
+                $this->playerActionService->sendAction($display, new CollectNowAction());
             } catch (\Exception $e) {
                 $this->log->notice(
                     'DisplayId ' .
-                    $display['displayId'] .
+                    $row['displayId'] .
                     ' Save would have triggered Player Action, but the action failed with message: ' . $e->getMessage()
                 );
             }

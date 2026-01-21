@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2025 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -622,8 +622,8 @@ class Media implements \JsonSerializable
             $fileName = substr(basename($fileName), 0, strpos(basename($fileName), '?'));
         }
 
-        // Sanitize what we have left.
-        $fileName = htmlspecialchars($fileName);
+        // Sanitize what we have left and make it fit in the space we have.
+        $fileName = substr(htmlspecialchars($fileName), 0, 254);
 
         $this->mediaId = $this->getStore()->insert('
             INSERT INTO `media` (`name`, `type`, duration, originalFilename, userID, retired, moduleSystemFile, released, apiRef, valid, `createdDt`, `modifiedDt`, `enableStat`, `folderId`, `permissionsFolderId`, `orientation`, `width`, `height`)
@@ -793,7 +793,7 @@ class Media implements \JsonSerializable
 
                 if (!@copy($this->fileName, $libraryFolder . $this->storedAs)) {
                     $this->getLog()->error(sprintf('Cannot copy %s to %s', $this->fileName, $libraryFolder . $this->storedAs));
-                    throw new ConfigurationException(__('Problem copying provided file into the Library Folder'));
+                    throw new ConfigurationException(__('This media has expired and cannot be replaced.'));
                 }
             }
         }

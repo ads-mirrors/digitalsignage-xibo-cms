@@ -72,6 +72,7 @@ class LayoutListener
         $dispatcher->addListener(PlaylistDeleteEvent::$NAME, [$this, 'onPlaylistDelete']);
         $dispatcher->addListener(LayoutSharingChangeEvent::$NAME, [$this, 'onLayoutSharingChange']);
         $dispatcher->addListener(RegionAddedEvent::$NAME, [$this, 'onRegionAdded']);
+
         return $this;
     }
 
