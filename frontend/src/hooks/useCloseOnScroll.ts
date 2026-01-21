@@ -19,19 +19,22 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
 .*/
 
-import React from 'react';
+import { useEffect } from 'react';
 
-interface TextProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
-  subtext?: string;
-  className?: string;
-}
+export function useCloseOnScroll(isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) return;
 
-export function Text({ children, subtext, className = '', ...props }: TextProps) {
-  return (
-    <div className={`flex flex-col ${className}`} {...props}>
-      <span className="text-gray-800">{children}</span>
-      {subtext && <span className="text-gray-500">{subtext}</span>}
-    </div>
-  );
+    const handleEvent = () => {
+      onClose();
+    };
+
+    window.addEventListener('scroll', handleEvent, true);
+    window.addEventListener('resize', handleEvent);
+
+    return () => {
+      window.removeEventListener('scroll', handleEvent, true);
+      window.removeEventListener('resize', handleEvent);
+    };
+  }, [isOpen, onClose]);
 }

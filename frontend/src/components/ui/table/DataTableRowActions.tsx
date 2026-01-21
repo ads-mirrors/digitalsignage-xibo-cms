@@ -19,71 +19,62 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import type { LucideIcon } from 'lucide-react';
 import { MoreVertical } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { twMerge } from 'tailwind-merge';
 
-export interface RowAction<TData> {
+import { useClickOutside } from '@/hooks/useClickOutside';
+import { useCloseOnScroll } from '@/hooks/useCloseOnScroll';
+
+export interface DataTableRowAction<TData> {
   label?: string;
   onClick?: (row: TData) => void;
-  icon?: ReactNode;
-  variant?: 'default' | 'danger';
+  icon?: LucideIcon;
+  variant?: 'default' | 'primary' | 'danger';
   isSeparator?: boolean;
   isQuickAction?: boolean;
 }
 
-interface RowActionsProps<TData> {
+interface DataTableRowActionsProps<TData> {
   row: TData;
-  actions: RowAction<TData>[];
+  actions: DataTableRowAction<TData>[];
 }
 
-export default function RowActions<TData>({ row, actions }: RowActionsProps<TData>) {
+const DROPDOWN_WIDTH = 180;
+
+export default function DataTableRowActions<TData>({
+  row,
+  actions,
+}: DataTableRowActionsProps<TData>) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { t } = useTranslation();
-
-  // Close on click outside or scroll
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(target) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(target)
-      ) {
-        setOpen(false);
-      }
+  // Close when clicking outside
+  useClickOutside(dropdownRef, (e) => {
+    const target = e.target as Node;
+    if (buttonRef.current && !buttonRef.current.contains(target)) {
+      setOpen(false);
     }
+  });
 
-    function handleScroll() {
-      if (open) setOpen(false);
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [open]);
+  // Close when scrolling
+  useCloseOnScroll(open, () => setOpen(false));
 
   const toggleOpen = (e: React.MouseEvent) => {
     e.stopPropagation();
+
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setCoords({
         top: rect.bottom + 2,
-        left: rect.right - 180,
+        left: rect.right - DROPDOWN_WIDTH,
       });
     }
     setOpen(!open);
@@ -98,8 +89,10 @@ export default function RowActions<TData>({ row, actions }: RowActionsProps<TDat
       <button
         ref={buttonRef}
         onClick={toggleOpen}
-        className="p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none transition-colors"
+        className="p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none transition-colors cursor-pointer"
         aria-label={t('More actions')}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         <MoreVertical className="w-4 h-4" />
       </button>
@@ -112,9 +105,9 @@ export default function RowActions<TData>({ row, actions }: RowActionsProps<TDat
               top: coords.top,
               left: coords.left,
             }}
-            className="fixed w-[180px] bg-white shadow-xl z-9999 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+            className="fixed bg-white shadow-lg z-100 rounded-xl overflow-hidden"
           >
-            <div className="py-1">
+            <div className="p-2">
               {actions.map((action, idx) => {
                 if (action.isSeparator) {
                   return <div key={idx} className="my-1 h-px bg-gray-100" role="separator" />;
@@ -128,15 +121,18 @@ export default function RowActions<TData>({ row, actions }: RowActionsProps<TDat
                       if (action.onClick) action.onClick(row);
                       setOpen(false);
                     }}
-                    className={`flex items-center w-full text-left px-4 py-2 text-sm transition-colors text-gray-700 ${
+                    className={twMerge(
+                      'flex items-center w-full gap-3 rounded-lg text-left px-3 py-2 text-sm transition-colors cursor-pointer',
                       action.variant === 'danger'
-                        ? 'text-red-600 hover:bg-red-50'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                        ? 'text-red-800 hover:bg-red-50 focus:bg-red-100'
+                        : action.variant === 'primary'
+                          ? 'text-blue-800 hover:bg-blue-50 focus:bg-blue-100'
+                          : 'text-gray-800 hover:bg-gray-50 focus:bg-gray-100',
+                    )}
                   >
                     {action.icon && (
-                      <span className="mr-2 w-4 h-4 flex items-center justify-center">
-                        {action.icon}
+                      <span className="w-4 h-4 flex items-center justify-center">
+                        {action.icon && <action.icon />}
                       </span>
                     )}
                     {action.label}

@@ -19,19 +19,25 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
 .*/
 
-interface StatusProps {
-  label: string;
-  type?: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
-}
+import type { LucideIcon } from 'lucide-react';
+import { Check, X } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
 
-const styles = {
-  success: 'bg-teal-100',
-  warning: 'bg-yellow-100',
-  danger: 'bg-red-100',
-  info: 'bg-blue-100',
-  neutral: 'bg-gray-100',
-};
+const BASE_STYLE = 'inline-flex justify-center items-center size-6 rounded-lg';
 
-export function Status({ label, type = 'neutral' }: StatusProps) {
-  return <span className={`inline-flex gap-x-1.5 py-1 px-2 ${styles[type]}`}>{label}</span>;
+export function CheckMarkCell({ active = true }) {
+  const Icon = (active ? Check : X) as LucideIcon;
+
+  return (
+    <div className="flex items-center justify-center">
+      <span
+        className={twMerge(
+          BASE_STYLE,
+          active ? 'text-teal-800 bg-teal-100' : 'text-gray-500 bg-gray-50',
+        )}
+      >
+        <Icon className="size-4"></Icon>
+      </span>
+    </div>
+  );
 }
