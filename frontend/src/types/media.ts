@@ -20,6 +20,7 @@
 .*/
 
 export interface MediaRow {
+  storedAs: string;
   mediaId: number;
   name: string;
   thumbnail: string;
