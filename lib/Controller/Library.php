@@ -689,6 +689,16 @@ class Library extends Base
                 $media->setUnmatchedProperty('hasFullScreenLayout', (!empty($fullScreenCampaignId)));
                 $media->setUnmatchedProperty('fullScreenCampaignId', $fullScreenCampaignId);
             }
+
+            // User permissions
+            $userPermissions = [
+                'view'      => $user->checkViewable($media),
+                'edit'      => $user->checkEditable($media),
+                'delete'    => $user->checkDeleteable($media),
+                'modify'    => $user->checkPermissionsModifyable($media),
+            ];
+
+            $media->setUnmatchedProperty('userPermissions', $userPermissions);
         }
 
         $this->getState()->template = 'grid';
