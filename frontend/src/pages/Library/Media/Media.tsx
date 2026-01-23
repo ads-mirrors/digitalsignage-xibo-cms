@@ -45,6 +45,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Button from '@/components/ui/Button';
+import MediaPreviewer from '@/components/ui/MediaPreviewer';
 import FilterInputs from '@/components/ui/media/FilterInputs';
 import MediaTopbar from '@/components/ui/media/MediaTopNav';
 import { DataTable } from '@/components/ui/table/DataTable';
@@ -58,9 +59,8 @@ import {
   TagsCell,
 } from '@/components/ui/table/cells';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fetchMedia, deleteMedia } from '@/services/mediaApi';
+import { fetchMedia, deleteMedia, downloadMedia } from '@/services/mediaApi';
 import type { MediaRow } from '@/types/media';
-
 interface ApiTag {
   tagId: number;
   tag: string;
@@ -106,6 +106,14 @@ const getStatusTypeFromMediaType = (mediaType: string) => {
   }
 };
 
+const downloadMediaHandle = async (data: MediaRow) => {
+  try {
+    await downloadMedia(data.mediaId, data.storedAs);
+  } catch (error) {
+    console.error('Download failed', error);
+  }
+};
+
 export default function Media() {
   const { t } = useTranslation();
 
@@ -124,9 +132,7 @@ export default function Media() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [activeTab, setActiveTab] = useState('Media');
   const [openFilter, setOpenFilter] = useState(false);
-
-  const debouncedFilter = useDebounce(globalFilter, 500);
-
+  const [previewItem, setPreviewItem] = useState<MediaRow | null>(null);
   const [filterInputs, setFilterInput] = useState<FilterInput>({
     type: '',
     owner: '',
@@ -135,6 +141,8 @@ export default function Media() {
     retired: '',
     lastModified: '',
   });
+
+  const debouncedFilter = useDebounce(globalFilter, 500);
 
   const bulkActions: DataTableBulkAction<MediaRow>[] = [
     {
@@ -216,21 +224,27 @@ export default function Media() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handlePreviewClick = (row: MediaRow) => {
+    setPreviewItem(row);
+  };
+
   useEffect(() => {
     const controller = new AbortController();
 
     async function load() {
       setLoading(true);
       try {
-        const sortState = sorting?.[0];
         const startOffset = pagination.pageIndex * pagination.pageSize;
+
+        const sortBy = sorting.map((s) => s.id).join(',');
+        const sortDir = sorting.map((s) => (s.desc ? 'desc' : 'asc')).join(',');
 
         const result = await fetchMedia({
           start: startOffset,
           length: pagination.pageSize,
           media: debouncedFilter,
-          sortBy: sortState?.id,
-          sortDir: sortState?.desc ? 'desc' : 'asc',
+          sortBy: sortBy || undefined,
+          sortDir: sortDir || undefined,
           signal: controller.signal,
         });
 
@@ -286,10 +300,10 @@ export default function Media() {
       enableSorting: false,
       cell: (info) => (
         <MediaCell
-          id={info.row.original.mediaId}
           thumb={info.row.original.thumbnail}
           alt={info.row.original.name}
           mediaType={(info.row.original.mediaType as MediaType) || 'other'}
+          onPreview={() => handlePreviewClick(info.row.original)}
         />
       ),
     },
@@ -451,7 +465,7 @@ export default function Media() {
             {
               label: t('Download'),
               icon: Download,
-              onClick: (data) => console.log('Download', data.mediaId),
+              onClick: downloadMediaHandle,
               isQuickAction: true,
             },
 
@@ -479,7 +493,7 @@ export default function Media() {
             {
               label: t('Download'),
               icon: Download,
-              onClick: (data) => console.log('Download', data.mediaId),
+              onClick: downloadMediaHandle,
             },
             {
               label: t('Schedule'),
@@ -597,6 +611,15 @@ export default function Media() {
           },
         }}
         bulkActions={bulkActions}
+      />
+
+      <MediaPreviewer
+        mediaId={previewItem?.mediaId ?? null}
+        mediaType={previewItem?.mediaType}
+        fileName={previewItem?.name}
+        mediaData={previewItem}
+        onDownload={() => previewItem && downloadMediaHandle(previewItem)}
+        onClose={() => setPreviewItem(null)}
       />
     </section>
   );

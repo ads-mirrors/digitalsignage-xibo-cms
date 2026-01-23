@@ -19,7 +19,7 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
 .*/
 
-import type { Table } from '@tanstack/react-table';
+import type { Table, VisibilityState } from '@tanstack/react-table';
 import { ChevronDown, Printer, FileDown, RefreshCw, X } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +34,7 @@ interface DataTableOptionsProps<TData> {
   onPrint?: () => void;
   onRefresh?: () => void;
   onCSVExport?: () => void;
+  columnVisibility?: VisibilityState;
 }
 
 export function DataTableOptions<TData>({
@@ -41,6 +42,7 @@ export function DataTableOptions<TData>({
   onPrint,
   onRefresh,
   onCSVExport,
+  columnVisibility,
 }: DataTableOptionsProps<TData>) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -48,13 +50,13 @@ export function DataTableOptions<TData>({
 
   useClickOutside(dropdownRef, () => setIsOpen(false));
 
+  const currentVisibility = columnVisibility ?? table.getState().columnVisibility;
+
   const columns = table.getAllLeafColumns().filter((column) => column.getCanHide());
 
   if (columns.length === 0) {
     return null;
   }
-
-  console.log('DataTableOptions Render');
 
   return (
     <div className="flex gap-3">
@@ -72,18 +74,20 @@ export function DataTableOptions<TData>({
         </Button>
 
         {isOpen && (
-          <div className="absolute right-0 top-11 w-52 z-50 rounded-lg overflow-hidden bg-white shadow-lg border border-gray-200">
+          <div className="absolute right-0 top-11 w-52 z-50 max-h-[354px] flex flex-col rounded-lg overflow-hidden bg-white shadow-lg border border-gray-200">
             <div className="relative flex bg-gray-100 px-3 py-2 justify-between items-center">
               <span className="text-gray-500 text-sm font-semibold uppercase leading-normal">
                 {t('Visible Columns')}
               </span>
-
-              <div className="flex items-center justify-center size-6 absolute right-[5px] cursor-pointer">
-                <X className="size-4 text-gray-500" onClick={() => setIsOpen(false)} />
+              <div
+                className="flex items-center justify-center size-6 absolute right-[5px] cursor-pointer"
+                onClick={() => setIsOpen(false)}
+              >
+                <X className="size-4 text-gray-500" />
               </div>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-1 px-2">
+            <div className="overflow-y-auto space-y-1 px-2">
               {columns.map((column) => {
                 let label = column.id;
                 const header = column.columnDef.header;
@@ -94,16 +98,16 @@ export function DataTableOptions<TData>({
 
                 const uniqueCheckboxId = `col-toggle-${column.id}`;
 
-                const isChecked = column.getIsVisible();
+                const isVisible = currentVisibility[column.id] ?? true;
 
                 return (
                   <Checkbox
                     key={column.id}
                     id={uniqueCheckboxId}
                     label={label}
-                    checked={isChecked}
+                    checked={isVisible}
                     className="px-3 py-2.5 gap-4"
-                    classNameLabel="m-0"
+                    classNameLabel="m-0 font-semibold text-gray-800"
                     onChange={(e) => {
                       column.toggleVisibility(!!e.target.checked);
                     }}

@@ -27,7 +27,7 @@ export interface FetchMediaParams {
   length: number;
   media?: string;
   sortBy?: string;
-  sortDir?: 'asc' | 'desc' | string;
+  sortDir?: string;
   signal?: AbortSignal;
 }
 
@@ -57,13 +57,31 @@ export async function fetchMedia(
   };
 }
 
+export async function fetchMediaBlob(mediaId: number | string): Promise<Blob> {
+  const response = await http.get(`/library/download/${mediaId}`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+export async function downloadMedia(mediaId: number | string, fileName: string): Promise<void> {
+  const blob = await fetchMediaBlob(mediaId);
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.setAttribute('download', fileName);
+
+  document.body.appendChild(link); // Required for Firefox
+  link.click();
+
+  link.parentNode?.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
 export async function deleteMedia(mediaId: number | string, force: boolean = false): Promise<void> {
   await http.delete(`/library/${mediaId}`, {
-    params: {
-      forceDelete: force ? 1 : 0,
-    },
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-    },
+    params: { forceDelete: force ? 1 : 0 },
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
   });
 }

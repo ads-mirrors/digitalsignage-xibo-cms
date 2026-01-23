@@ -32,7 +32,7 @@ import {
   type Column,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, FileSearch2 } from 'lucide-react';
 import { type CSSProperties, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { twMerge } from 'tailwind-merge';
@@ -226,6 +226,7 @@ export function DataTable<TData, TValue>({
             onRefresh={onRefresh}
             onCSVExport={handleExportCSV}
             onPrint={handlePrint}
+            columnVisibility={columnVisibility}
           />
         </div>
       </div>
@@ -243,12 +244,21 @@ export function DataTable<TData, TValue>({
 
         <div className="overflow-auto w-full printable-table-container flex-1">
           <table
-            className="min-w-full border-separate border-spacing-0 table-fixed bg-white"
-            style={{ width: table.getTotalSize() }}
+            className={twMerge(
+              'border-separate border-spacing-0 bg-white',
+              'w-full min-w-full',
+              // Fix for header width with no results
+              table.getRowModel().rows.length === 0
+                ? 'table-auto min-h-full'
+                : 'table-fixed h-auto',
+            )}
+            style={{
+              minWidth: table.getRowModel().rows.length === 0 ? '100%' : table.getTotalSize(),
+            }}
           >
-            <thead className="bg-gray-50 z-10 shadow-sm">
+            <thead className="z-10 shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
+                <tr className="bg-gray-50 " key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
                     const isSorted = header.column.getIsSorted();
                     const canSort = header.column.getCanSort();
@@ -343,8 +353,24 @@ export function DataTable<TData, TValue>({
                 })
               ) : (
                 <tr>
-                  <td colSpan={columns.length} className="h-24 text-center text-gray-500">
-                    {loading ? '' : t('No results!')}
+                  <td colSpan={columns.length} className="text-center text-gray-500 no-results">
+                    {!loading && (
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="inline-flex justify-center items-center size-15.5 rounded-full bg-gray-100 text-gray-500 border-7 border-gray-50">
+                          <FileSearch2 className="shrink-0 size-5" />
+                        </div>
+
+                        <h3 className="text-lg font-semibold text-gray-800">
+                          {t('No results found.')}
+                        </h3>
+
+                        <p className="text-gray-500">
+                          {t(
+                            "Reset your filters or adjust your search to find what you're looking for.",
+                          )}
+                        </p>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )}

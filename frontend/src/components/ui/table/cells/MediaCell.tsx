@@ -24,10 +24,10 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface MediaProps {
-  id: number;
   thumb?: string;
   alt?: string;
   mediaType: 'image' | 'video' | 'audio' | 'pdf' | 'archive' | 'other';
+  onPreview: () => void;
 }
 
 const getIcon = (type: MediaProps['mediaType']) => {
@@ -47,18 +47,17 @@ const getIcon = (type: MediaProps['mediaType']) => {
   }
 };
 
-export function MediaCell({ id, thumb, alt, mediaType }: MediaProps) {
+export function MediaCell({ thumb, alt, mediaType, onPreview }: MediaProps) {
   const { t } = useTranslation();
   const [hasError, setHasError] = useState(false);
 
   const handlePreview = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log(`Previewing ${mediaType}:`, id);
+    onPreview();
   };
 
   const isPlayable = mediaType === 'video' || mediaType === 'audio';
   const showThumbnail = thumb && !hasError;
-
   const Icon = getIcon(mediaType);
 
   return (
