@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -670,6 +670,14 @@ class MediaFactory extends BaseFactory
             ';
         }
 
+        if ($sanitizedFilter->getString('keyword') != null) {
+            // Fulltext search
+            $body .= $this->buildSearchQuery(
+                $sanitizedFilter->getString('keyword'),
+                $params
+            );
+        }
+
         if ($sanitizedFilter->getString('name') != null) {
             $terms = explode(',', $sanitizedFilter->getString('name'));
             $logicalOperator = $sanitizedFilter->getString('logicalOperatorName', ['default' => 'OR']);
@@ -1033,9 +1041,12 @@ class MediaFactory extends BaseFactory
         $order = [];
 
         foreach ($sortOrder as $sort) {
+            // Separate sort by and sort order
             $sortArr = explode(' ', trim($sort), 2);
 
-            $column = trim($sortArr[0], '`');
+            // Trim and sanitize sort by and normalize (remove table name if existing)
+            $columnParts = explode('.', str_replace('`', '', trim($sortArr[0])));
+            $column = end($columnParts);
 
             // Check against the allowed columns
             if (!isset($columnMapping[$column])) {
@@ -1050,5 +1061,49 @@ class MediaFactory extends BaseFactory
         }
 
         return $order ?? null;
+    }
+
+    /**
+     * Sanitize and build the search terms
+     * @param string $searchTerm
+     * @param array $params
+     * @return string
+     */
+    private function buildSearchQuery(string $searchTerm, array &$params): string
+    {
+        // Sanitize and handle multi-word search
+        $terms  = array_filter(array_map('trim', explode(',', $searchTerm)));
+        $search = implode(' ', $terms);
+
+        // Prepare fulltext search term
+        $body = ' AND (
+                        MATCH(
+                            media.name,
+                            media.originalFileName,
+                            media.storedAs
+                        )
+                        AGAINST (:search IN BOOLEAN MODE)
+                 ';
+
+        $params['search'] = $search;
+
+        // Filter numeric inputs and prepare ID search term
+        $ids = array_filter($terms, 'ctype_digit');
+
+        if (!empty($ids)) {
+            $placeholders = [];
+
+            foreach ($ids as $i => $id) {
+                $key = 'id_' . $i;
+                $placeholders[] = ':' . $key;
+                $params[$key] = (int) $id;
+            }
+
+            $body .= ' OR media.mediaId IN (' . implode(',', $placeholders) . ')';
+        }
+
+        $body .= ')';
+
+        return $body;
     }
 }
