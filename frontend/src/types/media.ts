@@ -20,11 +20,12 @@
  */
 
 export interface MediaRow {
+  folderId: number;
   storedAs: string;
   mediaId: number;
   name: string;
   thumbnail: string;
-  mediaType: string;
+  mediaType: MediaType;
   createdDt: string;
   owner: string;
   width?: number;
@@ -32,12 +33,14 @@ export interface MediaRow {
   valid: boolean;
   fileName: string;
   fileSizeFormatted: string;
-  orientation: string;
+  orientation: 'portrait' | 'landscape';
   tags: Tag[];
   duration: number;
   mediaNoExpiryDate: string;
   enableStat: string;
   retired: boolean;
+  expires: number;
+  updateInLayouts: boolean;
 }
 
 export interface Tag {
@@ -45,3 +48,5 @@ export interface Tag {
   tagId: number;
   value: string | number;
 }
+
+export type MediaType = 'image' | 'video' | 'audio' | 'pdf' | 'archive' | 'other';
