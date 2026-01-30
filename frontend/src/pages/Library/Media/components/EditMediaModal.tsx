@@ -21,7 +21,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { Image, Film, Music, FileText, Archive, File, HelpCircle, Loader2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Modal from '../../../../components/ui/modals/Modal';
@@ -36,13 +36,14 @@ import SelectDropdown from '@/components/ui/forms/SelectDropdown';
 import SelectFolder from '@/components/ui/forms/SelectFolder';
 import TagInput from '@/components/ui/forms/TagInput';
 import { updateMedia } from '@/services/mediaApi';
-import type { MediaRow, MediaType, Tag } from '@/types/media';
+import type { Media, MediaType } from '@/types/media';
+import type { Tag } from '@/types/tag';
 
 interface EditMediaModalProps {
   openModal: boolean;
-  data: MediaRow;
+  data: Media;
   onClose: () => void;
-  onSave: (updated: MediaRow) => void;
+  onSave: (updated: Media) => void;
 }
 
 type MediaDraft = {
@@ -170,7 +171,7 @@ export default function EditMediaModal({ openModal, onClose, data, onSave }: Edi
     });
 
     setExpiry(expiresToExpiryValue(data.expires));
-  }, [data]);
+  }, [data, expiry]);
 
   const handleSave = async () => {
     if (isSaving) return;
@@ -204,6 +205,7 @@ export default function EditMediaModal({ openModal, onClose, data, onSave }: Edi
       title={t('Edit Media')}
       onClose={onClose}
       isOpen={openModal}
+      scrollable={false}
       actions={[
         {
           label: t('Cancel'),
@@ -217,177 +219,183 @@ export default function EditMediaModal({ openModal, onClose, data, onSave }: Edi
         },
       ]}
     >
-      {isSaving && (
-        <div className="absolute w-full h-full center bg-black/20 top-0 left-0 z-10">
-          <span className="flex items-center gap-1 flex-col text-white">
-            <Loader2 size={32} className="animate-spin text-white" />
-            {isSaving ? t('Saving…') : t('Save')}
-          </span>
-        </div>
-      )}
-      {/* Media Preview */}
-      <div className="p-4 flex gap-3 bg-slate-50 mt-3">
-        <div className="h-[150px] aspect-7/6 relative bg-gray-400 overflow-hidden rounded">
-          <div className="h-[150px] aspect-7/6 bg-gray-100 flex items-center justify-center rounded">
-            {data.thumbnail ? (
-              <>
-                {isImageLoading && <div className="absolute inset-0 animate-pulse bg-gray-200" />}
-                <img
-                  src={data.thumbnail}
-                  alt={data.fileName}
-                  onLoad={() => setIsImageLoading(false)}
-                  onError={() => setIsImageLoading(false)}
-                  className={`h-full w-full object-contain transition-opacity duration-300 ${
-                    isImageLoading ? 'opacity-0' : 'opacity-100'
-                  }`}
-                />
-              </>
-            ) : (
-              <Icon className="w-10 h-10 text-gray-400" />
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col justify-between flex-1">
-          <div>
-            <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
-              {t('FILE NAME')} <HelpCircle size={12} />
-            </span>
-            <span className="text-sm">{t(data.fileName)}</span>
-          </div>
-          <div>
-            <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
-              {t('FILE SIZE')} <HelpCircle size={12} />
-            </span>
-            <span className="text-sm">{t(data.fileSizeFormatted)}</span>
-          </div>
-          <div>
-            <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
-              {t('RESOLUTION')} <HelpCircle size={12} />
-            </span>
-            <span className="text-sm">
-              {data.width} x {data.height}
+      <div className="flex flex-col h-full overflow-y-hidden overflow-x-visible gap-3 p-4 pt-0 relative">
+        {isSaving && (
+          <div className="absolute w-full h-full flex items-center justify-center bg-black/20 top-0 left-0 z-10 rounded-lg">
+            <span className="flex items-center gap-1 flex-col text-white">
+              <Loader2 size={32} className="animate-spin text-white" />
+              {isSaving ? t('Saving…') : t('Save')}
             </span>
           </div>
-        </div>
-        <div className="">
-          <Button variant="secondary" className="border-0 bg-transparent">
-            {t('Replace File')}
-          </Button>
-        </div>
-      </div>
-      {/* Forms */}
-      <div className="flex flex-col gap-3 mt-3 max-h-[450px] overflow-y-auto px-2">
-        {/* Select Folder */}
-        <SelectFolder
-          value={draft.folder}
-          homeFolders={MEDIA_FORM_OPTIONS.folders.home}
-          myFileFolders={MEDIA_FORM_OPTIONS.folders.myFiles}
-          isOpen={openSelect === 'folder'}
-          onToggle={toggleFolder}
-          onSelect={(folder) => {
-            setDraft((prev) => ({ ...prev, folder }));
-            setOpenSelect(null);
-          }}
-        />
+        )}
 
-        {/* Name */}
-        <div className="flex flex-col">
-          <label htmlFor="folderLocation" className="text-xs font-semibold text-gray-500 leading-5">
-            {t('Name')}
-          </label>
-          <input
-            className="border-gray-200 text-sm rounded-lg"
-            name="name"
-            value={draft.name}
-            onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
+        <div className="shrink-0 p-4 m-4 mt-0 flex gap-3 bg-slate-50 rounded-lg">
+          <div className="h-[150px] aspect-7/6 relative bg-gray-400 overflow-hidden rounded">
+            <div className="h-[150px] aspect-7/6 bg-gray-100 flex items-center justify-center rounded">
+              {data.thumbnail ? (
+                <>
+                  {isImageLoading && <div className="absolute inset-0 animate-pulse bg-gray-200" />}
+                  <img
+                    src={data.thumbnail}
+                    alt={data.fileName}
+                    onLoad={() => setIsImageLoading(false)}
+                    onError={() => setIsImageLoading(false)}
+                    className={`h-full w-full object-contain transition-opacity duration-300 ${
+                      isImageLoading ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  />
+                </>
+              ) : (
+                <Icon className="w-10 h-10 text-gray-400" />
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-between flex-1">
+            <div>
+              <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
+                {t('FILE NAME')} <HelpCircle size={12} />
+              </span>
+              <span className="text-sm">{t(data.fileName)}</span>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
+                {t('FILE SIZE')} <HelpCircle size={12} />
+              </span>
+              <span className="text-sm">{t(data.fileSizeFormatted)}</span>
+            </div>
+            <div>
+              <span className="text-sm text-gray-500 font-semibold flex items-center gap-1">
+                {t('RESOLUTION')} <HelpCircle size={12} />
+              </span>
+              <span className="text-sm">
+                {data.width} x {data.height}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <Button variant="secondary" className="border-0 bg-transparent">
+              {t('Replace File')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 flex-1 min-h-0 p-4 overflow-y-auto heyItsMe">
+          {/* Select Folder */}
+          <SelectFolder
+            value={draft.folder}
+            homeFolders={MEDIA_FORM_OPTIONS.folders.home}
+            myFileFolders={MEDIA_FORM_OPTIONS.folders.myFiles}
+            isOpen={openSelect === 'folder'}
+            onToggle={toggleFolder}
+            onSelect={(folder) => {
+              setDraft((prev) => ({ ...prev, folder }));
+              setOpenSelect(null);
+            }}
+          />
+
+          {/* Name */}
+          <div className="flex flex-col">
+            <label htmlFor="name" className="text-xs font-semibold text-gray-500 leading-5">
+              {t('Name')}
+            </label>
+            <input
+              id="name"
+              className="border-gray-200 text-sm rounded-lg"
+              name="name"
+              value={draft.name}
+              onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
+            />
+          </div>
+
+          {/* Tags */}
+          <TagInput
+            value={draft.tags}
+            helpText={t('Tags (Comma-separated: Tag or Tag|Value)')}
+            onChange={(tags) => setDraft((prev) => ({ ...prev, tags }))}
+          />
+
+          {/* Orientation */}
+          <SelectDropdown
+            label="Orientation"
+            value={draft.orientation}
+            placeholder="Select orientation"
+            options={MEDIA_FORM_OPTIONS.orientation}
+            isOpen={openSelect === 'orientation'}
+            onToggle={() =>
+              setOpenSelect((prev) => (prev === 'orientation' ? null : 'orientation'))
+            }
+            onSelect={(value) => {
+              setDraft((prev) => ({ ...prev, orientation: value as 'portrait' | 'landscape' }));
+              setOpenSelect(null);
+            }}
+          />
+
+          {/* Duration */}
+          <DurationInput
+            value={draft.duration}
+            onChange={(seconds) =>
+              setDraft((prev) => ({
+                ...prev,
+                duration: seconds,
+              }))
+            }
+          />
+
+          {/* Expiry Date */}
+          <ExpiryDateSelect
+            value={expiry}
+            options={MEDIA_FORM_OPTIONS.expiryDates}
+            isOpen={openSelect === 'expiry'}
+            onToggle={() => setOpenSelect((prev) => (prev === 'expiry' ? null : 'expiry'))}
+            onSelect={(value) => {
+              setExpiry(value);
+              setOpenSelect(null);
+            }}
+          />
+
+          {/* Inherit */}
+          <SelectDropdown
+            label="Enable Media Stats Collection?"
+            value={draft.enableStat}
+            placeholder="Inherit"
+            options={MEDIA_FORM_OPTIONS.inherit}
+            isOpen={openSelect === 'enableStat'}
+            onToggle={() => setOpenSelect((prev) => (prev === 'enableStat' ? null : 'enableStat'))}
+            onSelect={(value) => {
+              setDraft((prev) => ({ ...prev, enableStat: value }));
+              setOpenSelect(null);
+            }}
+            helper={t(
+              `Enable the collection of Proof of Play statistics for this Media Item. Ensure that 'Enable Stats Collection' is set to 'On' in the Display Settings.`,
+            )}
+          />
+
+          {/* Retired */}
+          <Checkbox
+            id="retired"
+            className="items-center"
+            title={t('Retire this media?')}
+            label={t(
+              `Retired media remains on existing Layouts but is not available to assign to new Layouts.`,
+            )}
+            checked={draft.retired}
+            classNameLabel="text-xs"
+            onChange={() => setDraft((prev) => ({ ...prev, retired: !prev.retired }))}
+          />
+          <Checkbox
+            id="update"
+            className="items-center"
+            title={t('Update this media in all layouts it is assigned to')}
+            label={t(`Note: It will only be updated in layouts you have permission to edit.`)}
+            checked={draft.updateInLayouts}
+            classNameLabel="text-xs"
+            onChange={() =>
+              setDraft((prev) => ({ ...prev, updateInLayouts: !prev.updateInLayouts }))
+            }
           />
         </div>
-
-        {/* Tags */}
-        <TagInput
-          value={draft.tags}
-          helpText={t('Tags (Comma-separated: Tag or Tag|Value)')}
-          onChange={(tags) => setDraft((prev) => ({ ...prev, tags }))}
-        />
-
-        {/* Orientation */}
-        <SelectDropdown
-          label="Orientation"
-          value={draft.orientation}
-          placeholder="Select orientation"
-          options={MEDIA_FORM_OPTIONS.orientation}
-          isOpen={openSelect === 'orientation'}
-          onToggle={() => setOpenSelect((prev) => (prev === 'orientation' ? null : 'orientation'))}
-          onSelect={(value) => {
-            setDraft((prev) => ({
-              ...prev,
-              orientation: value as 'portrait' | 'landscape',
-            }));
-            setOpenSelect(null);
-          }}
-        />
-
-        {/* Duration */}
-        <DurationInput
-          value={draft.duration}
-          onChange={(seconds) =>
-            setDraft((prev) => ({
-              ...prev,
-              duration: seconds,
-            }))
-          }
-        />
-
-        {/* Expiry Date */}
-        <ExpiryDateSelect
-          value={expiry}
-          options={MEDIA_FORM_OPTIONS.expiryDates}
-          isOpen={openSelect === 'expiry'}
-          onToggle={() => setOpenSelect((prev) => (prev === 'expiry' ? null : 'expiry'))}
-          onSelect={(value) => {
-            setExpiry(value);
-            setOpenSelect(null);
-          }}
-        />
-
-        {/* Inherit */}
-        <SelectDropdown
-          label="Enable Media Stats Collection?"
-          value={draft.enableStat}
-          placeholder="Inherit"
-          options={MEDIA_FORM_OPTIONS.inherit}
-          isOpen={openSelect === 'enableStat'}
-          onToggle={() => setOpenSelect((prev) => (prev === 'enableStat' ? null : 'enableStat'))}
-          onSelect={(value) => {
-            setDraft((prev) => ({ ...prev, enableStat: value }));
-            setOpenSelect(null);
-          }}
-          helper={t(
-            `Enable the collection of Proof of Play statistics for this Media Item. Ensure that 'Enable Stats Collection' is set to 'On' in the Display Settings.`,
-          )}
-        />
-
-        {/* Retired */}
-        <Checkbox
-          id="retired"
-          className="items-center"
-          title={t('Retire this media?')}
-          label={t(
-            `Retired media remains on existing Layouts but is not available to assign to new Layouts.`,
-          )}
-          checked={draft.retired}
-          classNameLabel="text-xs"
-          onChange={() => setDraft((prev) => ({ ...prev, retired: !prev.retired }))}
-        />
-        <Checkbox
-          id="update"
-          className="items-center"
-          title={t('Update this media in all layouts it is assigned to')}
-          label={t(`Note: It will only be updated in layouts you have permission to edit.`)}
-          checked={draft.updateInLayouts}
-          classNameLabel="text-xs"
-          onChange={() => setDraft((prev) => ({ ...prev, updateInLayouts: !prev.updateInLayouts }))}
-        />
       </div>
     </Modal>
   );

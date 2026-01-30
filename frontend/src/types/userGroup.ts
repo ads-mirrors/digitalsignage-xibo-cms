@@ -19,30 +19,17 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import type { Tag } from './tag';
+import type { User } from './user';
 
-export interface Media {
-  folderId: number;
-  storedAs: string;
-  mediaId: number;
-  name: string;
-  thumbnail: string;
-  mediaType: MediaType;
-  createdDt: string;
-  ownerId: string;
-  width?: number;
-  height?: number;
-  valid: boolean;
-  fileName: string;
-  fileSizeFormatted: string;
-  orientation: 'portrait' | 'landscape';
-  tags: Tag[];
-  duration: number;
-  mediaNoExpiryDate: string;
-  enableStat: string;
-  retired: boolean;
-  expires: number;
-  updateInLayouts: boolean;
+export interface UserGroup {
+  groupId: number;
+  group: string;
+  isUserSpecific: number;
+  isEveryone: number;
+  description?: string;
+  defaultHomepageId?: string;
+
+  features?: string[];
+
+  users?: User[];
 }
-
-export type MediaType = 'image' | 'video' | 'audio' | 'pdf' | 'archive' | 'other';

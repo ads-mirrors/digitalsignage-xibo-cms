@@ -33,7 +33,6 @@ import { useTranslation } from 'react-i18next';
 import {
   getMediaColumns,
   getBulkActions,
-  FILTER_OPTIONS,
   INITIAL_FILTER_STATE,
   LIBRARY_TABS,
   type MediaFilterInput,
@@ -54,8 +53,9 @@ import { DataTable } from '@/components/ui/table/DataTable';
 import { useUploadContext } from '@/context/UploadContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import EditMediaModal from '@/pages/Library/Media/components/EditMediaModal';
+import { useMediaFilterOptions } from '@/pages/Library/Media/hooks/useMediaFilterOptions';
 import { deleteMedia, downloadMedia } from '@/services/mediaApi';
-import type { MediaRow } from '@/types/media';
+import type { Media } from '@/types/media';
 
 export default function Media() {
   const { t } = useTranslation();
@@ -69,7 +69,7 @@ export default function Media() {
   const [globalFilter, setGlobalFilter] = useState('');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [openFilter, setOpenFilter] = useState(false);
-  const [previewItem, setPreviewItem] = useState<MediaRow | null>(null);
+  const [previewItem, setPreviewItem] = useState<Media | null>(null);
   const [filterInputs, setFilterInput] = useState<MediaFilterInput>(INITIAL_FILTER_STATE);
 
   const [isAddModalOpen, setAddModalOpen] = useState(false);
@@ -90,10 +90,9 @@ export default function Media() {
   // Data fetching
   const {
     data: queryData,
-    isLoading,
+    isFetching,
     isError,
     error: queryError,
-    isPlaceholderData,
   } = useMediaData({
     pagination,
     sorting,
@@ -106,7 +105,7 @@ export default function Media() {
   const pageCount = Math.ceil((queryData?.totalCount || 0) / pagination.pageSize);
   const error = isError && queryError instanceof Error ? queryError.message : '';
 
-  const [mediaList, setMediaList] = useState<MediaRow[]>([]);
+  const [mediaList, setMediaList] = useState<Media[]>([]);
 
   useEffect(() => {
     setMediaList(data ?? []);
@@ -153,7 +152,7 @@ export default function Media() {
     }
   };
 
-  const handleBulkDelete = async (selectedItems: MediaRow[]) => {
+  const handleBulkDelete = async (selectedItems: Media[]) => {
     if (selectedItems.length === 0) {
       return;
     }
@@ -172,7 +171,7 @@ export default function Media() {
     }
   };
 
-  const handleDownload = async (row: MediaRow) => {
+  const handleDownload = async (row: Media) => {
     try {
       await downloadMedia(row.mediaId, row.storedAs);
     } catch (error) {
@@ -180,7 +179,7 @@ export default function Media() {
     }
   };
 
-  const handlePreviewClick = (row: MediaRow) => {
+  const handlePreviewClick = (row: Media) => {
     setPreviewItem(row);
   };
 
@@ -205,7 +204,7 @@ export default function Media() {
     handleRefresh();
   };
 
-  const openEditModal = (media: MediaRow) => {
+  const openEditModal = (media: Media) => {
     setSelectedMediaId(media.mediaId);
     toggleModal('edit', true);
   };
@@ -217,6 +216,11 @@ export default function Media() {
 
   const toggleModal = (name: string, isOpen: boolean) => {
     setOpenModal((prev) => ({ ...prev, [name]: isOpen }));
+  };
+
+  const handleResetFilters = () => {
+    setFilterInput(INITIAL_FILTER_STATE);
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
   const columns = getMediaColumns({
@@ -256,6 +260,8 @@ export default function Media() {
     { id: 3, name: 'Q1 Campaigns' },
     { id: 99, name: 'Temporary' },
   ];
+
+  const { filterOptions } = useMediaFilterOptions();
 
   return (
     <section
@@ -332,7 +338,8 @@ export default function Media() {
         }}
         open={openFilter}
         values={filterInputs}
-        options={FILTER_OPTIONS}
+        options={filterOptions}
+        onReset={handleResetFilters}
       />
 
       {error && (
@@ -351,7 +358,7 @@ export default function Media() {
         onSortingChange={setSorting}
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
-        loading={isLoading && !isPlaceholderData}
+        loading={isFetching}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         onRefresh={handleRefresh}
@@ -372,7 +379,7 @@ export default function Media() {
             fileName: false,
             expires: false,
             enableStat: false,
-            owner: false,
+            ownerId: false,
           },
         }}
         bulkActions={bulkActions}
@@ -385,7 +392,7 @@ export default function Media() {
         actions={addModalActions}
         size="lg"
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 p-8 pt-0">
           {/* TODO: Folder select hardcoded for now */}
           <FolderSelect
             value={selectedFolderId}
@@ -430,6 +437,7 @@ export default function Media() {
             setMediaList((prev) =>
               prev.map((m) => (m.mediaId === updatedMedia.mediaId ? updatedMedia : m)),
             );
+            handleRefresh();
           }}
           data={selectedMedia}
         />

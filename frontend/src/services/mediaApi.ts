@@ -20,7 +20,7 @@
  */
 
 import http from '@/lib/api';
-import type { MediaRow } from '@/types/media';
+import type { Media } from '@/types/media';
 
 export interface FetchMediaRequest {
   start: number;
@@ -31,15 +31,15 @@ export interface FetchMediaRequest {
   signal?: AbortSignal;
 
   type?: string;
-  owner?: string;
-  userGroup?: string;
+  ownerId?: string;
+  ownerUserGroupId?: string;
   orientation?: string;
   retired?: string;
   lastModified?: string;
 }
 
 export interface FetchMediaResponse {
-  rows: MediaRow[];
+  rows: Media[];
   totalCount: number;
 }
 
@@ -188,7 +188,7 @@ export interface UpdateMediaRequest {
 export async function updateMedia(
   mediaId: number | string,
   data: UpdateMediaRequest,
-): Promise<MediaRow> {
+): Promise<Media> {
   const params = new URLSearchParams();
 
   params.append('name', data.name);
