@@ -192,6 +192,12 @@ export const ACCEPTED_MIME_TYPES = {
   'video/x-ms-wmv': ['.wmv'],
 };
 
+export const FILTER_DROPWN_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'User', value: 'user' },
+  { label: 'Group', value: 'group' },
+];
+
 const formatDuration = (seconds: number) => {
   if (!seconds) return '-';
   return new Date(seconds * 1000).toISOString().slice(11, 19);
@@ -221,6 +227,7 @@ interface GetMediaColumnsProps {
   onDelete: (id: number) => void;
   onDownload: (row: Media) => void;
   openEditModal: (row: Media) => void;
+  openShareModal?: () => void;
 }
 
 export const getMediaColumns = ({
@@ -229,6 +236,7 @@ export const getMediaColumns = ({
   onDelete,
   onDownload,
   openEditModal,
+  openShareModal,
 }: GetMediaColumnsProps): ColumnDef<Media>[] => {
   return [
     {
@@ -433,7 +441,7 @@ export const getMediaColumns = ({
             {
               label: t('Share'),
               icon: UserPlus2,
-              onClick: () => console.log('Share', row.original.mediaId),
+              onClick: openShareModal,
             },
             {
               label: t('Download'),

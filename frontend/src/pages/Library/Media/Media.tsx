@@ -30,6 +30,8 @@ import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
+import ShareModal from '../../../components/ui/modals/ShareModal';
+
 import {
   getMediaColumns,
   getBulkActions,
@@ -229,6 +231,7 @@ export default function Media() {
     onDelete: handleDelete,
     onDownload: handleDownload,
     openEditModal,
+    openShareModal: () => toggleModal('share', true),
   });
 
   const bulkActions = getBulkActions({
@@ -442,6 +445,7 @@ export default function Media() {
           data={selectedMedia}
         />
       )}
+      <ShareModal onClose={() => toggleModal('share', false)} openModal={openModal.share} />
       <UploadProgressDock isModalOpen={isAddModalOpen} />
     </section>
   );
