@@ -30,6 +30,7 @@ import { useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 
+import DeleteMediaModal from '../../../components/ui/modals/DeleteMediaModal';
 import ShareModal from '../../../components/ui/modals/ShareModal';
 
 import { getMediaItemActions } from './MediaConfig';
@@ -80,12 +81,16 @@ export default function Media() {
 
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState(1);
-
-  // Will need to add more modals later
   const [openModal, setOpenModal] = useState({
     edit: false,
     share: false,
+    delete: false,
   });
+
+  const [itemsToDelete, setItemsToDelete] = useState<Media[]>([]);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
 
   const debouncedFilter = useDebounce(globalFilter, 500);
@@ -150,33 +155,48 @@ export default function Media() {
     addFiles(files, selectedFolderId);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
+    const media = mediaList.find((m) => m.mediaId === id);
+    if (!media) return;
+
+    setItemsToDelete([media]);
+    setDeleteError(null);
+    toggleModal('delete', true);
+  };
+
+  const confirmDelete = async () => {
+    if (itemsToDelete.length === 0 || isDeleting) return;
+
     try {
-      await deleteMedia(id);
+      setIsDeleting(true);
+
+      const results = await Promise.allSettled(
+        itemsToDelete.map((item) => deleteMedia(item.mediaId)),
+      );
+
+      const failed = results.filter((r) => r.status === 'rejected');
+
+      if (failed.length > 0) {
+        setDeleteError(`${failed.length} item(s) could not be deleted because they are in use.`);
+      }
+
+      setRowSelection({});
       handleRefresh();
-    } catch (err) {
-      console.error('Failed to delete media!', err);
-      alert(t('Failed to delete media!'));
+      toggleModal('delete', false);
+    } catch (error) {
+      console.error(error);
+      setDeleteError('Some selected items are in use and cannot be deleted.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleBulkDelete = async (selectedItems: Media[]) => {
-    if (selectedItems.length === 0) {
-      return;
-    }
+  const handleBulkDelete = (selectedItems: Media[]) => {
+    if (selectedItems.length === 0) return;
 
-    const message = `${t('Are you sure you want to delete these items?')}\n(${selectedItems.length} selected)`;
-    if (window.confirm(message)) {
-      try {
-        await Promise.all(selectedItems.map((item) => deleteMedia(item.mediaId)));
-        setRowSelection({});
-        handleRefresh();
-      } catch (err) {
-        console.error('Bulk delete error', err);
-        alert(t('Some items could not be deleted. Check if they are in use.'));
-        handleRefresh();
-      }
-    }
+    setItemsToDelete(selectedItems);
+    setDeleteError(null);
+    toggleModal('delete', true);
   };
 
   const handleDownload = async (row: Media) => {
@@ -491,6 +511,15 @@ export default function Media() {
       )}
       <ShareModal onClose={() => toggleModal('share', false)} openModal={openModal.share} />
       <UploadProgressDock isModalOpen={isAddModalOpen} />
+      <DeleteMediaModal
+        isOpen={openModal.delete}
+        onClose={() => toggleModal('delete', false)}
+        onDelete={confirmDelete}
+        itemCount={itemsToDelete.length}
+        fileName={itemsToDelete.length === 1 ? itemsToDelete[0]?.name : undefined}
+        error={deleteError}
+        isLoading={isDeleting}
+      />
     </section>
   );
 }
