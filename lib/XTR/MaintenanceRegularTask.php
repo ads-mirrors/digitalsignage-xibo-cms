@@ -676,7 +676,7 @@ class MaintenanceRegularTask implements TaskInterface
     }
 
     /**
-     * Deletes unused full screen layouts
+     * Remove unused full screen layouts associated with a deleted event
      * @throws NotFoundException
      * @throws GeneralException
      */
@@ -688,6 +688,7 @@ class MaintenanceRegularTask implements TaskInterface
 
         foreach ($this->layoutFactory->query(null, [
             'filterLayoutStatusId' => 3,
+            'removeUnusedFullScreenLayouts' => 1,
             'isFullScreenCampaign' => 1
         ]) as $layout) {
             $count++;
