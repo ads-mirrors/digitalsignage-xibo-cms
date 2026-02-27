@@ -50,7 +50,7 @@ export interface Media {
   mediaNoExpiryDate: string;
   enableStat: string;
   retired: boolean;
-  expires: number;
+  expires: string;
   updateInLayouts: boolean;
   userPermissions: MediaPermissions;
 }
