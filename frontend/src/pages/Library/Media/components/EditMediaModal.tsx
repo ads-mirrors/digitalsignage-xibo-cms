@@ -223,7 +223,7 @@ export default function EditMediaModal({ openModal, onClose, data, onSave }: Edi
             }}
           />
 
-          {/* Inherit */}
+          {/* Enable Stats */}
           <SelectDropdown
             label="Enable Media Stats Collection?"
             value={draft.enableStat}

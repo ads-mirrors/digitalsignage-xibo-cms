@@ -51,10 +51,17 @@ import {
   ActionsCell,
   TagsCell,
 } from '@/components/ui/table/cells';
-import { APP_ROUTES } from '@/config/appRoutes';
+import { APP_ROUTES, generateTabNavigation } from '@/config/appRoutes';
 import type { Media } from '@/types/media';
 
-export const LIBRARY_TABS = APP_ROUTES.find((r) => r.path === 'library')?.subLinks || [];
+const libraryRoute = APP_ROUTES.find((route) => {
+  if (route.path === 'library') {
+    return true;
+  }
+  return false;
+});
+
+export const LIBRARY_TABS = libraryRoute ? generateTabNavigation(libraryRoute) : [];
 
 export interface MediaFilterInput {
   type: string;
@@ -119,6 +126,7 @@ export const INITIAL_FILTER_STATE: MediaFilterInput = {
   lastModified: '',
 };
 
+// TODO: Needs translation
 export const BASE_FILTER_KEYS: FilterConfigItem<MediaFilterInput>[] = [
   {
     label: 'Type',
@@ -187,12 +195,8 @@ export const BASE_FILTER_KEYS: FilterConfigItem<MediaFilterInput>[] = [
   },
 ];
 
+// TODO: Needs translation
 export const MEDIA_FORM_OPTIONS = {
-  folders: {
-    myFiles: ['Folder 1', 'Folder 2', 'Folder 3'],
-    home: ['USER 1', 'USER 2', 'USER 3', 'USER 4'],
-  },
-
   expiryDates: ['Never Expire', 'End of Today', 'In 7 Days', 'In 14 Days', 'In 30 Days'],
 
   orientation: [
@@ -239,7 +243,9 @@ export const ACCEPTED_MIME_TYPES = {
 };
 
 const formatDuration = (seconds: number) => {
-  if (!seconds) return '-';
+  if (typeof seconds != 'number') {
+    return '-';
+  }
   return new Date(seconds * 1000).toISOString().slice(11, 19);
 };
 
@@ -449,7 +455,7 @@ export const getMediaColumns = (props: MediaActionsProps): ColumnDef<Media>[] =>
     {
       accessorKey: 'name',
       header: t('Name'),
-      size: 240,
+      size: 200,
       enableHiding: false,
       cell: (info) => <TextCell weight="bold">{info.getValue<string>()}</TextCell>,
     },
@@ -517,7 +523,7 @@ export const getMediaColumns = (props: MediaActionsProps): ColumnDef<Media>[] =>
       cell: (info) => <TextCell>{info.getValue<string>()}</TextCell>,
     },
     {
-      accessorKey: 'ownerId',
+      accessorKey: 'owner',
       header: t('Owner'),
       size: 150,
       cell: (info) => <TextCell>{info.getValue<string>()}</TextCell>,
@@ -556,9 +562,16 @@ export const getMediaColumns = (props: MediaActionsProps): ColumnDef<Media>[] =>
     },
     {
       accessorKey: 'enableStat',
-      header: t('Stats?'),
+      header: t('Stats'),
       size: 100,
-      cell: (info) => <StatusCell label={info.getValue() as string} type="neutral" />,
+      cell: (info) => {
+        const value = info.getValue();
+        if (value === 'Inherit') {
+          return <StatusCell label={info.getValue() as string} type="neutral" />;
+        } else {
+          return <CheckMarkCell active={info.getValue() === 'on'} />;
+        }
+      },
     },
     {
       accessorKey: 'createdDt',
