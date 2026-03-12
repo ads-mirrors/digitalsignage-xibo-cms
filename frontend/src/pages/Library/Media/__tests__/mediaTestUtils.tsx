@@ -20,7 +20,7 @@
  */
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
@@ -30,7 +30,40 @@ import { useMediaData } from '../hooks/useMediaData';
 import { UploadProvider } from '@/context/UploadContext';
 import { UserProvider } from '@/context/UserContext';
 import { testQueryClient } from '@/setupTests';
+import type { Media as MediaItem } from '@/types/media';
 import type { User, UserFeatures } from '@/types/user';
+
+// ---------------------------------------------------------------------------
+// mockEditMedia.
+// userPermissions.edit: 1  so the Edit quick-action button is visible.
+// expires: ''             so expiry resolves to { type: 'never' } = "Never Expire".
+// tags: [{ tag: 'nature', value: 'forest' }] for serialisation tests.
+// ---------------------------------------------------------------------------
+export const mockEditMedia: MediaItem = {
+  mediaId: 42,
+  name: 'test-image.png',
+  folderId: 1,
+  storedAs: 'test-image.png',
+  thumbnail: '',
+  mediaType: 'image',
+  createdDt: '2026-01-01 00:00:00',
+  modifiedDt: '2026-01-02 00:00:00',
+  ownerId: '1',
+  valid: true,
+  fileName: 'test-image.png',
+  fileSizeFormatted: '500 KB',
+  fileSize: 512000,
+  orientation: 'landscape',
+  tags: [{ tag: 'nature', value: 'forest', tagId: 1 }],
+  duration: 10,
+  mediaNoExpiryDate: '1',
+  enableStat: 'Inherit',
+  expires: '',
+  retired: false,
+  updateInLayouts: false,
+  userPermissions: { view: 1, edit: 1, delete: 1 },
+  deleteOldRevisions: false,
+};
 
 export const mockUser: User = {
   userId: 1,
@@ -54,6 +87,15 @@ export type UseMediaReturn = ReturnType<typeof useMediaData>;
 
 export const mockMediaData = (overrides: unknown) => {
   vi.mocked(useMediaData).mockReturnValue(overrides as UseMediaReturn);
+};
+
+// openEditModal: waits for the media row to appear (DataTable hydrated), then
+// clicks the Edit quick-action button and waits for the dialog.
+export const openEditModal = async () => {
+  await screen.findAllByText(mockEditMedia.name);
+  const editBtn = screen.getByRole('button', { name: 'Edit' });
+  fireEvent.click(editBtn);
+  return screen.findByRole('dialog', { name: 'Edit Media' });
 };
 
 // ---------------------------------------------------------------------------
