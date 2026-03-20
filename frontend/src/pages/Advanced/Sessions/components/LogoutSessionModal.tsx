@@ -90,7 +90,7 @@ export default function LogoutSessionModal({
         <span className="flex gap-px rounded-md bg-gray-50 p-1.5">
           <Info size={12} />
           <span className="text-[12px] px-1 font-medium">
-            {t('This user will be logged out from this session')}
+            {t(`This user will be logged out from this session`)}
           </span>
         </span>
 
