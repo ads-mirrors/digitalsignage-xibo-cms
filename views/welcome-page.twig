@@ -157,7 +157,7 @@
             {
                 title: '{% trans "Create Content" %}',
                 text: 'Create your own eye catching Layout designs using a variety of tools available in the Layout Editor.',
-                firstLink: '{{ url_for("layout.view") }}',
+                firstLink: '{{ theme.rootUri() }}prototype/design/layout',
                 secondLink: '{{ helpService.getLandingPage }}layouts_editor',
                 imageUrl: '{{ theme.rootUri() }}theme/default/img/onboarding/create-content.png',
                 videoLinks: {
