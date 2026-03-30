@@ -1584,7 +1584,7 @@ class LayoutFactory extends BaseFactory
 
                     $this->getLog()->debug(sprintf(
                         'Checking Widget for the old mediaID [%d] so we can replace it with the new mediaId '
-                            . '[%d] and storedAs [%s]. Media assigned to widget %s.',
+                        . '[%d] and storedAs [%s]. Media assigned to widget %s.',
                         $oldMediaId,
                         $newMediaId,
                         $media->storedAs,
@@ -2157,11 +2157,15 @@ class LayoutFactory extends BaseFactory
         $allowedColumns = ['layoutId', 'layout', 'publishedStatus', 'enableStat', 'duration', 'owner', 'modifiedDt',
             'campaignId'
         ];
+        $customColumns = [
+            'orientation' => 'CASE WHEN layout.`width` < layout.`height` THEN 1 ELSE 0 END',
+            'valid' => '`status`'
+        ];
 
         $sortOrder = $this->buildSortQuery(
             $sortOrder,
             $allowedColumns,
-            ['valid' => '`status`'],
+            $customColumns,
             ['layout ASC']
         );
 
@@ -2661,7 +2665,6 @@ class LayoutFactory extends BaseFactory
                 ['layout.layout', 'layout.description'],
                 ['layout.layoutId', 'campaign.campaignId'],
             );
-
         }
 
         // Logged in user view permissions
