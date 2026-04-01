@@ -235,6 +235,7 @@ $app->group('', function (RouteCollectorProxy $group) {
  * Templates
  */
 $app->get('/template', ['\Xibo\Controller\Template', 'grid'])->setName('template.search');
+$app->get('/template/{id}', ['\Xibo\Controller\Template', 'searchById'])->setName('template.search.id');
 $app->group('', function (RouteCollectorProxy $group) {
     $group->post('/template', ['\Xibo\Controller\Template', 'add'])->setName('template.add');
     $group->post('/template/{id}', ['\Xibo\Controller\Template', 'addFromLayout'])->setName('template.add.from.layout');
@@ -244,6 +245,7 @@ $app->group('', function (RouteCollectorProxy $group) {
  * Resolutions
  */
 $app->get('/resolution', ['\Xibo\Controller\Resolution','grid'])->setName('resolution.search');
+$app->get('/resolution/{id}', ['\Xibo\Controller\Resolution','searchById'])->setName('resolution.search.id');
 $app->post('/resolution', ['\Xibo\Controller\Resolution','add'])
     ->addMiddleware(new FeatureAuth($app->getContainer(), ['resolution.add']))
     ->setName('resolution.add');
@@ -257,6 +259,7 @@ $app->group('', function (RouteCollectorProxy $group) {
  * Library
  */
 $app->get('/library', ['\Xibo\Controller\Library','grid'])->setName('library.search');
+$app->get('/library/{id}', ['\Xibo\Controller\Library','searchById'])->setName('library.search.id');
 $app->get('/library/{id}/isused', ['\Xibo\Controller\Library','isUsed'])->setName('library.isused');
 
 $app->group('', function (RouteCollectorProxy $group) {
@@ -629,6 +632,7 @@ $app->group('', function (RouteCollectorProxy $group) {
  * Dayparts
  */
 $app->get('/daypart', ['\Xibo\Controller\DayPart','grid'])->setName('daypart.search');
+$app->get('/daypart/{id}', ['\Xibo\Controller\DayPart','searchById'])->setName('daypart.search.id');
 $app->post('/daypart', ['\Xibo\Controller\DayPart','add'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['daypart.add']))
     ->setName('daypart.add');
