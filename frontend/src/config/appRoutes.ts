@@ -218,15 +218,21 @@ export const APP_ROUTES: AppRoute[] = [
     icon: Monitor,
     subLinks: [
       {
-        path: 'add-displays',
-        labelKey: 'Add Displays',
-        externalURL: '/display/view',
+        path: 'displays',
+        labelKey: 'Displays',
+        lazy: () =>
+          import('@/pages/Displays/Displays/Displays').then((m) => ({
+            Component: m.default,
+          })),
         feature: 'displays.view',
       },
       {
         path: 'display-groups',
         labelKey: 'Display Groups',
-        externalURL: '/displaygroup/view',
+        lazy: () =>
+          import('@/pages/Displays/DisplayGroup/DisplayGroup').then((m) => ({
+            Component: m.default,
+          })),
         feature: 'displaygroup.view',
       },
       {
@@ -237,8 +243,11 @@ export const APP_ROUTES: AppRoute[] = [
       },
       {
         path: 'settings',
-        labelKey: 'Settings',
-        externalURL: '/displayprofile/view',
+        labelKey: 'Display Settings',
+        lazy: () =>
+          import('@/pages/Displays/DisplayProfile/DisplayProfile').then((m) => ({
+            Component: m.default,
+          })),
         feature: 'displayprofile.view',
       },
       {

@@ -210,28 +210,8 @@ $app->post('/library/connector/import', ['\Xibo\Controller\Library', 'connectorI
 //
 $app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
     $group->get('/display/map', ['\Xibo\Controller\Display', 'displayMap'])->setName('display.map');
-    $group->get('/display/view', ['\Xibo\Controller\Display', 'displayPage'])->setName('display.view');
     $group->get('/display/manage/{id}', ['\Xibo\Controller\Display', 'displayManage'])->setName('display.manage');
-    $group->get('/display/form/screenshot/{id}', ['\Xibo\Controller\Display','requestScreenShotForm'])->setName('display.screenshot.form');
-    $group->get('/display/form/wol/{id}', ['\Xibo\Controller\Display','wakeOnLanForm'])->setName('display.wol.form');
-    $group->get('/display/form/licenceCheck/{id}', ['\Xibo\Controller\Display','checkLicenceForm'])->setName('display.licencecheck.form');
-    $group->get('/display/form/purgeAll/{id}', ['\Xibo\Controller\Display','purgeAllForm'])->setName('display.purge.all.form');
 })->addMiddleware(new FeatureAuth($app->getContainer(), ['displays.view']));
-
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
-    $group->get('/display/form/addViaCode', ['\Xibo\Controller\Display','addViaCodeForm'])->setName('display.addViaCode.form');
-    $group->get('/display/form/authorise/{id}', ['\Xibo\Controller\Display','authoriseForm'])->setName('display.authorise.form');
-})->addMiddleware(new FeatureAuth($app->getContainer(), ['displays.add']));
-
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
-    $group->get('/display/form/edit/{id}', ['\Xibo\Controller\Display', 'editForm'])->setName('display.edit.form');
-    $group->get('/display/form/delete/{id}', ['\Xibo\Controller\Display', 'deleteForm'])->setName('display.delete.form');
-    $group->get('/display/form/defaultlayout/{id}', ['\Xibo\Controller\Display','defaultLayoutForm'])->setName('display.defaultlayout.form');
-    $group->get('/display/form/moveCms/{id}', ['\Xibo\Controller\Display','moveCmsForm'])->setName('display.moveCms.form');
-    $group->get('/display/form/moveCmsCancel/{id}', ['\Xibo\Controller\Display','moveCmsCancelForm'])->setName('display.moveCmsCancel.form');
-    $group->get('/display/form/membership/{id}', ['\Xibo\Controller\Display','membershipForm'])->setName('display.membership.form');
-    $group->get('/display/form/setBandwidthLimit', ['\Xibo\Controller\Display','setBandwidthLimitMultipleForm'])->setName('display.setBandwidthLimitMultiple.form');
-})->addMiddleware(new FeatureAuth($app->getContainer(), ['displays.modify']));
 
 //
 // user
@@ -319,50 +299,6 @@ $app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
     $group->get('/dataset/dataConnector/request/{id}', ['\Xibo\Controller\DataSet', 'dataConnectorRequest'])->setName('dataSet.dataConnector.request');
     $group->get('/dataset/dataConnector/test/{id}', ['\Xibo\Controller\DataSet', 'dataConnectorTest'])->setName('dataSet.dataConnector.test');
 })->addMiddleware(new FeatureAuth($app->getContainer(), ['dataset.modify']));
-
-//
-// displaygroup
-//
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
-    $group->get('/displaygroup/view', ['\Xibo\Controller\DisplayGroup','displayPage'])->setName('displaygroup.view');
-    $group->get('/displaygroup/form/command/{id}', ['\Xibo\Controller\DisplayGroup','commandForm'])->setName('displayGroup.command.form');
-    $group->get('/displaygroup/form/collect/{id}', ['\Xibo\Controller\DisplayGroup','collectNowForm'])->setName('displayGroup.collectNow.form');
-    $group->get('/displaygroup/form/trigger/webhook/{id}', ['\Xibo\Controller\DisplayGroup','triggerWebhookForm'])->setName('displayGroup.trigger.webhook.form');
-})->addMiddleware(new FeatureAuth($app->getContainer(), ['displaygroup.view']));
-
-$app->get('/displaygroup/form/add', ['\Xibo\Controller\DisplayGroup','addForm'])
-    ->addMiddleware(new FeatureAuth($app->getContainer(), ['displaygroup.add']))
-    ->setName('displayGroup.add.form');
-
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
-    $group->get('/displaygroup/form/edit/{id}', ['\Xibo\Controller\DisplayGroup','editForm'])->setName('displayGroup.edit.form');
-    $group->get('/displaygroup/form/delete/{id}', ['\Xibo\Controller\DisplayGroup','deleteForm'])->setName('displayGroup.delete.form');
-    $group->get('/displaygroup/form/members/{id}', ['\Xibo\Controller\DisplayGroup','membersForm'])->setName('displayGroup.members.form');
-    $group->get('/displaygroup/form/media/{id}', ['\Xibo\Controller\DisplayGroup','mediaForm'])->setName('displayGroup.media.form');
-    $group->get('/displaygroup/form/layout/{id}', ['\Xibo\Controller\DisplayGroup','layoutsForm'])->setName('displayGroup.layout.form');
-    $group->get('/displaygroup/form/copy/{id}', ['\Xibo\Controller\DisplayGroup','copyForm'])->setName('displayGroup.copy.form');
-})->addMiddleware(new FeatureAuth($app->getContainer(), ['displaygroup.modify']));
-
-$app->get('/displaygroup/form/{id}/selectfolder', ['\Xibo\Controller\DisplayGroup','selectFolderForm'])
-    ->addMiddleware(new FeatureAuth($app->getContainer(), ['displaygroup.modify', 'display.modify']))
-    ->setName('displayGroup.selectfolder.form');
-
-//
-// displayprofile
-//
-$app->get('/displayprofile/view', ['\Xibo\Controller\DisplayProfile','displayPage'])
-    ->addMiddleware(new FeatureAuth($app->getContainer(), ['displayprofile.view']))
-    ->setName('displayprofile.view');
-
-$app->get('/displayprofile/form/add', ['\Xibo\Controller\DisplayProfile','addForm'])
-    ->addMiddleware(new FeatureAuth($app->getContainer(), ['displayprofile.add']))
-    ->setName('displayProfile.add.form');
-
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
-    $group->get('/displayprofile/form/edit/{id}', ['\Xibo\Controller\DisplayProfile','editForm'])->setName('displayProfile.edit.form');
-    $group->get('/displayprofile/form/delete/{id}', ['\Xibo\Controller\DisplayProfile','deleteForm'])->setName('displayProfile.delete.form');
-    $group->get('/displayprofile/form/copy/{id}', ['\Xibo\Controller\DisplayProfile','copyForm'])->setName('displayProfile.copy.form');
-})->addMiddleware(new FeatureAuth($app->getContainer(), ['displayprofile.modify']));
 
 //
 // group
