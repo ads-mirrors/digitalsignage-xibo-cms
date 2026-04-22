@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -2667,10 +2667,6 @@ window.initDatePicker = function(
     flatpickr.l10ns.default.firstDayOfWeek =
       parseInt(moment().startOf('week').format('d'));
 
-    // Check if element is inside of a modal
-    // and set it as static
-    const isStatic = $element.parents('.modal').length > 0;
-
     // Create flatpickr
     flatpickr($element, Object.assign({
       altInput: true,
@@ -2682,7 +2678,6 @@ window.initDatePicker = function(
       dateFormat: baseFormat,
       locale: (language != 'en-GB') ? language : 'default',
       defaultHour: '00',
-      static: isStatic,
       getWeek: function(dateObj) {
         return moment(dateObj).week();
       },
@@ -2693,11 +2688,6 @@ window.initDatePicker = function(
         return moment(date).format(format);
       },
     }, options));
-
-    // If it's a static flatpickr, fix flex CSS
-    if (isStatic) {
-      $element.parent().css('flex', 1);
-    }
   }
 
   // Callback for on change event
@@ -2854,6 +2844,11 @@ window.createMiniLayoutPreview = function(previewUrl) {
     }));
   }
 
+  // Set the previewJWT on the window.
+  const previewUrlUrl = new URL(previewUrl, window.location.origin);
+  window.previewJwt = previewUrlUrl.searchParams.get('jwt');
+
+  // Create the mini preview
   const $layoutPreview = $('.mini-layout-preview');
   const $layoutPreviewContent = $layoutPreview.find('#content');
 

@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2025 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -489,7 +489,12 @@ class Media implements \JsonSerializable
             $this->isSaveRequired = $this->isSaveRequired
                 || $this->valid == 0
                 || ($expires > 0 && $expires < Carbon::now()->format('U'))
-                || ($this->mediaType === 'module' && !file_exists($this->downloadSink(false)));
+                || ($this->mediaType === 'module' && (
+                    // Save is required if the file doesn't exist, and also if it exists but isn't the size
+                    // we have recorded for it in the database
+                    !file_exists($this->downloadSink(false))
+                    || ($this->fileSize > 0 && filesize($this->downloadSink(false)) !== $this->fileSize)
+                ));
 
             if ($options['audit']) {
                 $this->audit($this->mediaId, 'Updated', $this->getChangedProperties());

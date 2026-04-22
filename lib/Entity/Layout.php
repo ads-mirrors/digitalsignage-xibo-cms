@@ -1,6 +1,6 @@
 <?php
 /*
- * Copyright (C) 2024 Xibo Signage Ltd
+ * Copyright (C) 2026 Xibo Signage Ltd
  *
  * Xibo - Digital Signage - https://xibosignage.com
  *
@@ -1193,7 +1193,7 @@ class Layout implements \JsonSerializable
      * @param \Xibo\Entity\Layout $parent
      * @throws NotFoundException
      */
-    private function addWidgetHistory($parent)
+    private function addWidgetHistory(Layout $parent): void
     {
         // Get the most recent layout history record
         $layoutHistoryId = $this->getStore()->select('
@@ -1205,7 +1205,8 @@ class Layout implements \JsonSerializable
         if (count($layoutHistoryId) <= 0) {
             // We are missing the parent layout history record, which isn't good.
             // I think all we can do at this stage is log it
-            $this->getLog()->alert('Missing Layout History for layoutId ' . $parent->layoutId . ' which is on campaignId ' . $parent->campaignId);
+            $this->getLog()->alert('Missing Layout History for layoutId ' . $parent->layoutId
+                . ' which is on campaignId ' . $parent->campaignId);
             return;
         }
 
@@ -1213,13 +1214,19 @@ class Layout implements \JsonSerializable
 
         // Add records in the widget history table representing all widgets on this Layout
         foreach ($parent->getAllWidgets() as $widget) {
-
             // Does this widget have a mediaId
             $mediaId = null;
             try {
                 $mediaId = $widget->getPrimaryMediaId();
-            } catch (NotFoundException $notFoundException) {
-                // this is fine
+            } catch (NotFoundException) {
+                // this is fine (not always a media linked widget)
+            }
+
+            // What is the widget name?
+            $widgetName = $widget->getOptionValue('name', null);
+            if ($widgetName === '') {
+                // Sometimes the option has been saved as empty instead of null/not saved
+                $widgetName = null;
             }
 
             $this->getStore()->insert('
@@ -1230,7 +1237,7 @@ class Layout implements \JsonSerializable
                 'widgetId' => $widget->widgetId,
                 'mediaId' => $mediaId,
                 'type' => $widget->type,
-                'name' => $widget->getOptionValue('name', null),
+                'name' => $widgetName,
             ]);
         }
     }
@@ -2921,6 +2928,27 @@ class Layout implements \JsonSerializable
                 }
             }
         }
+    }
+
+    /**
+     * @param bool $includeWidgets Also include actions from each widget?
+     * @return \Xibo\Entity\Action[]
+     * @throws \Xibo\Support\Exception\NotFoundException
+     */
+    public function getActions(bool $includeWidgets = false): array
+    {
+        $actions = $this->actions;
+        if ($includeWidgets) {
+            foreach ($this->regions as $region) {
+                foreach ($region->getPlaylist()->widgets as $widget) {
+                    $widget->load();
+                    foreach ($widget->actions as $action) {
+                        $actions[] = $action;
+                    }
+                }
+            }
+        }
+        return $actions;
     }
 
     /**
