@@ -171,6 +171,13 @@ P: `password`
 ## Translations
 To parse the translations:
 
+React:
+```shell
+cd frontend
+npx i18next-cli extract
+```
+
+Then:
 ```shell
 docker-compose exec web sh -c "cd /var/www/cms; rm -R ./cache"
 docker-compose exec web sh -c "cd /var/www/cms; php bin/locale.php"
@@ -194,11 +201,17 @@ for i in *.po; do msgfmt "$i" -o $(echo $i | sed s/po/mo/); done
 
 Move the resulting `mo` files into your `locale` folder.
 
+Convert `mo` files to `json`
+  ```bash
+  cd frontend
+  npm run i18n:convert
+  ```
+
 ## Swagger API Docs
 To generate a `swagger.json` file, with the dev containers running:
 
 ```shell
-docker-compose exec web sh -c "cd /var/www/cms; vendor/bin/swagger lib -o web/swagger.json"
+docker-compose exec web sh -c "cd /var/www/cms; vendor/bin/openapi lib -o web/swagger.json"
 ```
 
 ## Application Structure

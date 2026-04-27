@@ -21,6 +21,7 @@
  */
 namespace Xibo\Controller;
 
+use OpenApi\Attributes as OA;
 use RobThree\Auth\TwoFactorAuth;
 use Slim\Flash\Messages;
 use Slim\Http\Response as Response;
@@ -409,27 +410,24 @@ class Login extends Base
         return $this->render($request, $response);
     }
 
+    #[OA\Get(
+        path: '/about',
+        operationId: 'about',
+        description: 'Information about this API, such as Version code, etc',
+        summary: 'About',
+        tags: ['misc']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'successful response',
+        content: new OA\JsonContent(
+            type: 'object',
+            additionalProperties: new OA\AdditionalProperties(type: 'string')
+        )
+    )]
     /**
      * Shows information about Xibo
      *
-     * @SWG\Get(
-     *  path="/about",
-     *  operationId="about",
-     *  tags={"misc"},
-     *  summary="About",
-     *  description="Information about this API, such as Version code, etc",
-     *  @SWG\Response(
-     *      response=200,
-     *      description="successful response",
-     *      @SWG\Schema(
-     *          type="object",
-     *          additionalProperties={
-     *              "title"="version",
-     *              "type"="string"
-     *          }
-     *      )
-     *  )
-     * )
      * @param Request $request
      * @param Response $response
      * @return \Psr\Http\Message\ResponseInterface|Response
@@ -440,13 +438,20 @@ class Login extends Base
     {
         $state = $this->getState();
 
-        if ($request->isXhr()) {
+        if ($request->isXhr() || $this->isApi($request)) {
             $state->template = 'about-text';
         } else {
             $state->template = 'about-page';
         }
 
-        $state->setData(['version' => Environment::$WEBSITE_VERSION_NAME, 'sourceUrl' => $this->getConfig()->getThemeConfig('cms_source_url')]);
+        // TODO: output source URL from settings.
+        $state->setData([
+            'version' => Environment::$WEBSITE_VERSION_NAME,
+            'revision' => Environment::getGitCommit(),
+            'playerVersion' => Environment::$PLAYER_SUPPORT,
+            'isDevMode' => Environment::isDevMode(),
+            'sourceUrl' => 'https://github.com/xibosignage/xibo-cms',
+        ]);
 
         return $this->render($request, $response);
     }
