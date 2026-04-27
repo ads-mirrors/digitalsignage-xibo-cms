@@ -14,7 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Backend**: PHP 8.4 with Slim 4 framework (MVC)
 - **Database**: MySQL 8.4 with Phinx migrations
-- **Frontend**: JavaScript/jQuery with Bootstrap 4, webpack
+- **Frontend (legacy)**: JavaScript/jQuery with Bootstrap 4, webpack (in `ui/`)
+- **Frontend (new)**: React 18 + TypeScript + Vite + TanStack React Table + Tailwind CSS (in `frontend/`)
 - **Dependency Injection**: PHP-DI 7.0
 - **Testing**: PHPUnit 10.5 (currently limited test suite)
 - **Logging**: Monolog 2.10
@@ -191,7 +192,25 @@ tests/
   └── LocalWebTestCase.php
 
 docker/                   # Docker entrypoint scripts and configurations
-containers/db/            # Docker Compose MySQL data volume
+containers/db/            # Docker Compose MySQL data volume (DO NOT SEARCH — large binary files)
+
+frontend/
+  ├── src/
+  │   ├── app/            # App root, routing config
+  │   ├── components/     # Shared React components (DataTable, MediaCell, etc.)
+  │   ├── context/        # React context providers
+  │   ├── hooks/          # Custom hooks (useOwner, useKeydown, useTableState, etc.)
+  │   ├── pages/          # Page components (Design/, Displays/, Library/)
+  │   │   ├── Design/
+  │   │   │   ├── Layouts/          # Layout list page + LayoutPreviewer, LayoutInfoPanel
+  │   │   │   ├── Campaigns/        # Campaign list page
+  │   │   │   └── Templates/        # Template list page
+  │   │   ├── Displays/
+  │   │   └── Library/Media/
+  │   ├── services/       # RTK Query API slices (layoutsApi, etc.)
+  │   ├── types/          # TypeScript interfaces (Layout, Campaign, Media, Tag, etc.)
+  │   └── utils/          # Shared utilities
+  └── vite.config.ts      # Vite build config; compiled output goes to web/dist/pages/
 ```
 
 ### Core Design Patterns
@@ -276,6 +295,19 @@ containers/db/            # Docker Compose MySQL data volume
 - Features: Feature flags, plugin settings
 
 ### Frontend Architecture
+
+**React Frontend** (new — `frontend/`):
+
+The newer admin pages are built in React and served at `/prototype/*` URLs (e.g. `/prototype/design/layout`, `/prototype/design/campaign`, `/prototype/displays/displays`). These are compiled by Vite and output to `web/dist/pages/`.
+
+Key patterns:
+- Pages live in `frontend/src/pages/{Section}/{PageName}/`
+- Each page has a `{Page}.tsx` (component), `{Page}Config.tsx` (column defs + actions), and a `hooks/` subfolder for data fetching
+- Column definitions use TanStack React Table `ColumnDef<T>[]`
+- Thumbnails are rendered via `MediaCell` (`components/ui/table/cells/MediaCell.tsx`) — pass `onPreview` to make them clickable
+- Preview modals (e.g. `LayoutPreviewer`) receive the full row object and should use the `previewUrl` property returned by the API (includes a JWT token), not hardcoded URL patterns
+- TypeScript types for API responses live in `frontend/src/types/`; add new API-returned fields there when the backend adds them
+- API calls use RTK Query service files in `frontend/src/services/`
 
 **Webpack Bundles** (from `webpack.config.js`):
 - `vendor.bundle.js` — Third-party libraries (jQuery, Bootstrap, etc.)
