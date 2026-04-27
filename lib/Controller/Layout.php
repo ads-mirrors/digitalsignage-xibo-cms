@@ -1505,7 +1505,6 @@ class Layout extends Base
         $parsedQueryParams = $this->getSanitizer($request->getQueryParams());
         // Should we parse the description into markdown
         $showDescriptionId = $parsedQueryParams->getInt('showDescriptionId');
-        $baseUrl = (new HttpsDetect())->getBaseUrl($request);
 
         // We might need to embed some extra content into the response if the "Show Description"
         // is set to media listing
@@ -1568,6 +1567,7 @@ class Layout extends Base
 
             // Preview
             if ($this->getUser()->featureEnabled('layout.view')) {
+                $baseUrl = (new HttpsDetect())->getBaseUrl($request);
                 $jwt = $this->jwtService->generateJwt(
                     'Preview',
                     'layout',
