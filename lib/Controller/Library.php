@@ -57,7 +57,6 @@ use Xibo\Helper\ByteFormatter;
 use Xibo\Helper\DateFormatHelper;
 use Xibo\Helper\HttpsDetect;
 use Xibo\Helper\LibraryDescription;
-use Xibo\Helper\LinkSigner;
 use Xibo\Helper\XiboUploadHandler;
 use Xibo\Middleware\TokenAuthMiddleware;
 use Xibo\Service\JwtServiceInterface;
@@ -2554,8 +2553,6 @@ class Library extends Base
         // Variables used for link signing/thumbnail generation
         $isReturnPublicUrls = $parsedQueryParams->getCheckbox('isReturnPublicUrls') == 1;
         $thumbnailRouteName = $isReturnPublicUrls ? 'library.public.thumbnail' : 'library.thumbnail';
-        $encryptionKey = $this->getConfig()->getApiKeyDetails()['encryptionKey'];
-        $rootUrl = (new HttpsDetect())->getUrl();
 
         $thumbnailUrl = '';
 
@@ -2577,11 +2574,11 @@ class Library extends Base
 
                     if ($isReturnPublicUrls) {
                         // Sign the link.
-                        $thumbnailUrl = $rootUrl . $thumbnailUrl . '?' . LinkSigner::getSignature(
-                            $rootUrl,
-                            $thumbnailUrl,
+                        $thumbnailUrl = TokenAuthMiddleware::sign(
+                            $request,
+                            '/preview/library/thumbnail/' . $media->mediaId,
                             time() + 3600,
-                            $encryptionKey,
+                            $this->getConfig()->getApiKeyDetails()['encryptionKey'],
                         );
                     }
                 }

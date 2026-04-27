@@ -102,7 +102,6 @@ class DataSetData extends Base
                 schema: new OA\Schema(type: 'integer')
             )
         ]
-
     )]
     /**
      * Grid
@@ -139,7 +138,7 @@ class DataSetData extends Base
         $params = array_merge($columnFilter['params'], $keywordFilter['params']);
 
         $filter = $this->gridRenderFilter([
-            'filter' => $request->getParam('filter', $columnFilter['filter']),
+            'filter' => $columnFilter['filter'],
             'keyword' => $keywordFilter['keyword']
         ], $sanitizedParams);
 
