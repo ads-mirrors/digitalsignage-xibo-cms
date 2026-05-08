@@ -28,32 +28,6 @@ use Xibo\Middleware\SuperAdminAuth;
 $app->get('/', ['\Xibo\Controller\User', 'home'])->setName('home');
 $app->get('/welcome', ['\Xibo\Controller\User', 'welcome'])->setName('welcome.view');
 
-//
-// Dashboards
-//
-$app->group('', function(RouteCollectorProxy $group) {
-    $group->get('/statusdashboard/displays', ['\Xibo\Controller\StatusDashboard', 'displays'])
-        ->setName('statusdashboard.displays');
-    $group->get('/statusdashboard/displayGroups', ['\Xibo\Controller\StatusDashboard', 'displayGroups'])
-        ->setName('statusdashboard.displayGroups');
-})->add(new FeatureAuth($app->getContainer(), ['dashboard.status']));
-
-$app->group('', function (RouteCollectorProxy $group) {
-    $group->get('/mediamanager/data', ['\Xibo\Controller\MediaManager', 'grid'])
-        ->setName('mediamanager.search');
-})->add(new FeatureAuth($app->getContainer(), ['dashboard.media.manager']));
-
-$app->group('', function (RouteCollectorProxy $group) {
-    $group->get('/playlistdashboard/data', ['\Xibo\Controller\PlaylistDashboard', 'grid'])
-        ->setName('playlistdashboard.search');
-    $group->get('/playlistdashboard/{id}', ['\Xibo\Controller\PlaylistDashboard', 'show'])
-        ->setName('playlistdashboard.show');
-    $group->get('/playlistdashboard/widget/form/delete/{id}', [
-        '\Xibo\Controller\PlaylistDashboard',
-        'deletePlaylistWidgetForm',
-    ])->setName('playlist.module.widget.delete.form');
-})->add(new FeatureAuth($app->getContainer(), ['dashboard.playlist']));
-
 // Login Form
 $app->get('/login', ['\Xibo\Controller\Login', 'loginForm'])->setName('login');
 

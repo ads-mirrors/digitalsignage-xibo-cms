@@ -128,7 +128,7 @@ $app->group('', function (RouteCollectorProxy $group) {
     $group->put('/layout/setenablestat/{id}',['\Xibo\Controller\Layout', 'setEnableStat'])->setName('layout.setenablestat');
 })->addMiddleware(new FeatureAuth($app->getContainer(), ['layout.modify']));
 
-$app->group('', function(\Slim\Routing\RouteCollectorProxy $group) {
+$app->group('', function (\Slim\Routing\RouteCollectorProxy $group) {
     $group->post('/layout/export/{id}', ['\Xibo\Controller\Layout', 'export'])->setName('layout.export');
 })->addMiddleware(new FeatureAuth($app->getContainer(), ['layout.export']));
 
@@ -555,20 +555,24 @@ $app->group('', function (RouteCollectorProxy $group) {
 })->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['users.modify']));
 
 // Dashboards
-$app->get('/icondashboard', ['\Xibo\Controller\IconDashboard', 'displayPage'])
-    ->setName('icondashboard.view');
-
 $app->get('/statusdashboard', ['\Xibo\Controller\StatusDashboard', 'displayPage'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['dashboard.status']))
     ->setName('statusdashboard.view');
 
-$app->get('/mediamanager', ['\Xibo\Controller\MediaManager', 'displayPage'])
+$app->get('/mediamanager', ['\Xibo\Controller\MediaManager', 'getLibraryUsage'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['dashboard.media.manager']))
     ->setName('mediamanager.view');
 
 $app->get('/playlistdashboard', ['\Xibo\Controller\PlaylistDashboard', 'displayPage'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['dashboard.playlist']))
     ->setName('playlistdashboard.view');
+
+$app->group('', function (RouteCollectorProxy $group) {
+    $group->get('/playlistdashboard/data', ['\Xibo\Controller\PlaylistDashboard', 'grid'])
+        ->setName('playlistdashboard.search');
+    $group->get('/playlistdashboard/{id}', ['\Xibo\Controller\PlaylistDashboard', 'show'])
+        ->setName('playlistdashboard.show');
+})->add(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['dashboard.playlist']));
 
 /**
  * User Group
