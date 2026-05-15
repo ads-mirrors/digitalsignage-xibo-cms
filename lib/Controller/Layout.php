@@ -229,7 +229,7 @@ class Layout extends Base
             throw new AccessDeniedException();
         }
 
-        // Get the parent layout if it's editable
+        // Get the draft layout if it's editable
         if ($layout->isEditable()) {
             // Get the Layout using the Draft ID
             $layout = $this->layoutFactory->getByParentId($id);
@@ -1866,6 +1866,12 @@ class Layout extends Base
                     3600,
                 )->toString();
 
+                // Published layout (this one)
+                $layout->setUnmatchedProperty(
+                    'previewUrl',
+                    $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt,
+                );
+
                 $layout->buttons[] = array(
                     'id' => 'layout_button_preview',
                     'external' => true,
@@ -1877,15 +1883,27 @@ class Layout extends Base
 
                 // Also offer a way to preview the draft layout.
                 if ($layout->hasDraft()) {
-                    $layout->buttons[] = array(
-                        'id' => 'layout_button_preview_draft',
-                        'external' => true,
-                        'url' => '#',
-                        'onclick' => 'createMiniLayoutPreview',
-                        'onclickParam' => $baseUrl . '/preview/layout/preview/' . $layout->layoutId . '?jwt=' . $jwt
-                            . '&isPreviewDraft=true',
-                        'text' => __('Preview Draft Layout')
-                    );
+                    try {
+                        $draftLayout = $this->layoutFactory->getByParentId($layout->layoutId);
+                        $jwt = $this->jwtService->generateJwt(
+                            'Preview',
+                            'layout',
+                            $draftLayout->layoutId,
+                            '/preview/layout/preview/' . $draftLayout->layoutId,
+                            3600,
+                        )->toString();
+
+                        $layout->buttons[] = array(
+                            'id' => 'layout_button_preview_draft',
+                            'external' => true,
+                            'url' => '#',
+                            'onclick' => 'createMiniLayoutPreview',
+                            'onclickParam' => $baseUrl . '/preview/layout/preview/' . $draftLayout->layoutId . '?jwt=' . $jwt,
+                            'text' => __('Preview Draft Layout')
+                        );
+                    } catch (NotFoundException) {
+                        // There should be a draft layout, but there isn't
+                    }
                 }
 
                 $layout->buttons[] = ['divider' => true];
@@ -2545,7 +2563,15 @@ class Layout extends Base
     public function status(Request $request, Response $response, $id)
     {
         // Get the layout
-        $layout = $this->layoutFactory->concurrentRequestLock($this->layoutFactory->getById($id));
+        $layout = $this->layoutFactory->getById($id);
+
+        // Ensure this layout is viewable for this user.
+        if (!$this->getUser()->checkViewable($layout)) {
+            throw new AccessDeniedException();
+        }
+
+        // Take out a lock
+        $layout = $this->layoutFactory->concurrentRequestLock($layout);
         try {
             $layout = $this->layoutFactory->decorateLockedProperties($layout);
             $layout->xlfToDisk();

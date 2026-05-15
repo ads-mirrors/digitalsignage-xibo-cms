@@ -145,8 +145,11 @@ $app->group('', function(RouteCollectorProxy $group) {
  * )
  */
 $app->get('/layout', ['\Xibo\Controller\Layout','grid'])->setName('layout.search');
-$app->get('/layout/status/{id}', ['\Xibo\Controller\Layout','status'])->setName('layout.status');
 $app->put('/layout/lock/release/{id}', ['\Xibo\Controller\Layout', 'releaseLock'])->setName('layout.lock.release');
+
+$app->get('/layout/status/{id}', ['\Xibo\Controller\Layout','status'])
+    ->setName('layout.status')
+    ->addMiddleware(new FeatureAuth($app->getContainer(), ['layout.view', 'template.view']));
 
 $app->group('', function (RouteCollectorProxy $group) {
     $group->post('/layout', ['\Xibo\Controller\Layout', 'add'])->setName('layout.add');
@@ -422,7 +425,9 @@ $app->get('/displaygroup', ['\Xibo\Controller\DisplayGroup','grid'])->setName('d
 $app->post('/displaygroup', ['\Xibo\Controller\DisplayGroup','add'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['displaygroup.add']))
     ->setName('displayGroup.add');
-$app->post('/displaygroup/criteria/{displayGroupId}', ['\Xibo\Controller\DisplayGroup','pushCriteriaUpdate'])->setName('displayGroup.criteria.push');
+$app->post('/displaygroup/criteria/{displayGroupId}', ['\Xibo\Controller\DisplayGroup','pushCriteriaUpdate'])
+    ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['displaygroup.modify', 'displays.modify']))
+    ->setName('displayGroup.criteria.push');
 
 $app->post('/displaygroup/{id}/action/collectNow', ['\Xibo\Controller\DisplayGroup','collectNow'])
     ->addMiddleware(new \Xibo\Middleware\FeatureAuth($app->getContainer(), ['displaygroup.view']))
