@@ -43,7 +43,13 @@ class Sql
         'DO', 'EXTRACTVALUE', 'UPDATEXML', 'XMLTYPE', 'DBMS_PIPE', 'PG_SLEEP',
         // Added String Builders & Encoders
         // we have specific use cases for 'CONCAT', so we keept that
-        'CONCAT_WS', 'CHAR', 'UNHEX', 'HEX', 'ASCII', 'BIN', 'ORD', 'BASE64'
+        'CONCAT_WS', 'CHAR', 'UNHEX', 'HEX', 'ASCII', 'BIN', 'ORD', 'BASE64',
+        // Resource-exhaustion functions
+        'REPEAT', 'SPACE', 'LPAD', 'RPAD', 'RANDOM_BYTES',
+        'SHA', 'SHA1', 'SHA2', 'MD5', 'AES_ENCRYPT', 'AES_DECRYPT',
+        'COMPRESS', 'UNCOMPRESS',
+        // Regex functions (ReDoS risk - unbounded backtracking complexity)
+        'REGEXP_REPLACE', 'REGEXP_SUBSTR', 'REGEXP_LIKE', 'REGEXP_INSTR', 'RLIKE',
     ];
 
     /**
