@@ -203,8 +203,8 @@ export default function AddCampaignModal({
             label={t('Type')}
             value={draft.type}
             options={[
-              { label: 'Layout list', value: 'list' },
-              { label: 'Ad Campaign', value: 'ad' },
+              { label: t('Layout list'), value: 'list' },
+              { label: t('Ad Campaign'), value: 'ad' },
             ]}
             onSelect={(val) =>
               setDraft((prev) => ({
@@ -305,8 +305,8 @@ export default function AddCampaignModal({
                   label={t('List play order')}
                   value={draft.listPlayOrder}
                   options={[
-                    { label: 'Round-robin', value: 'round' },
-                    { label: 'Block', value: 'block' },
+                    { label: t('Round-robin'), value: 'round' },
+                    { label: t('Block'), value: 'block' },
                   ]}
                   onSelect={(val) =>
                     setDraft((prev) => ({

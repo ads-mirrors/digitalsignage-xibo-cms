@@ -19,11 +19,7 @@
  * along with Xibo.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-export * from './ActionsCell';
-export * from './DescriptionCell';
-export * from './CheckboxCell';
-export * from './CheckMarkCell';
-export * from './MediaCell';
-export * from './StatusCell';
-export * from './TagsCell';
-export * from './TextCell';
+export interface FilterOption {
+  label: string;
+  value: string | number | null;
+}
